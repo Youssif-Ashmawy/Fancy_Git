@@ -1,5 +1,7 @@
 # Fancy Git
 
+![FancyGit Overview](images/overview.png)
+
 A smart CLI tool that provides intelligent recommendations and helps solve merge conflicts by analyzing git command outputs.
 
 ## Overview
@@ -117,6 +119,8 @@ Fancy_Git/
 ├── fancygit.py          # Main CLI application
 ├── start.sh             # Automated installation script
 ├── README.md            # This file
+├── images/              # Images and documentation
+│   └── overview.png     # Project overview image
 └── .git/                # Git repository
 ```
 
