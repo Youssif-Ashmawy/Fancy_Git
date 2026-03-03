@@ -30,21 +30,18 @@ FancyGit is a CLI wrapper around git commands that:
 
 ## Installation
 
-1. Clone the repository:
+### Quick Setup
+
+Run the automated installation script and provide your sudo password:
 ```bash
-git clone <repository-url>
-cd Fancy_Git
+./start.sh
 ```
 
-2. Make the script executable:
-```bash
-chmod +x fancygit.py
-```
-
-3. Create system-wide symlink:
-```bash
-sudo ln -sf $(pwd)/fancygit.py /usr/local/bin/fancygit
-```
+This script will:
+- Check Python 3.6+ and Git installation
+- Make fancygit.py executable
+- Create system-wide symlink
+- Test the installation
 
 ## Usage
 
@@ -118,6 +115,7 @@ FancyGit CLI → Git Commands → Collect Output → Pattern Matching → User I
 ```
 Fancy_Git/
 ├── fancygit.py          # Main CLI application
+├── start.sh             # Automated installation script
 ├── README.md            # This file
 └── .git/                # Git repository
 ```
