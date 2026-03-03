@@ -92,13 +92,13 @@ Command executed successfully!
 ```
 Running: git pull origin main
 ❌ Errors detected:
-  error: couldn't find remote ref refs/heads/main
+    error: couldn't find remote ref refs/heads/main
 ```
 
 ## Architecture
 
 ```
-FancyGit CLI → Git Commands → Collect Output → Pattern Matching → User Interface
+FancyGit CLI → Git Commands → Collect Output → Pattern Matching → User Interface (CLI)
 ```
 
 ## Future Roadmap
@@ -119,7 +119,7 @@ FancyGit CLI → Git Commands → Collect Output → Pattern Matching → User I
 Fancy_Git/
 ├── fancygit.py          # Main CLI application
 ├── README.md            # This file
-└── .git/               # Git repository
+└── .git/                # Git repository
 ```
 
 ## Requirements
@@ -127,6 +127,7 @@ Fancy_Git/
 - Python 3.6+
 - Git installed and configured
 - System permissions for symlink creation
+- Note: No external dependecies for now so no environment setup required 
 
 ## License
 
