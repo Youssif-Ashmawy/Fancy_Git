@@ -128,19 +128,16 @@ echo.
 
 
 REM -------------------------------------------------------
-REM  4c. ADD INSTALL DIR TO GIT BASH PATH via .bashrc
-REM  Removes any old/broken FancyGit line first, then appends
-REM  a clean one — so re-running the installer is always safe.
+REM  4c. ADD TO GIT BASH PATH via .bashrc
+REM  Always strips old FancyGit line first — safe to re-run
 REM -------------------------------------------------------
 SET "BASHRC=%USERPROFILE%\.bashrc"
 
-REM  Strip any existing FancyGit entry (handles broken old lines)
 if exist "!BASHRC!" (
     powershell -NoProfile -Command ^
         "(Get-Content '!BASHRC!') | Where-Object { $_ -notmatch 'FancyGit' } | Set-Content '!BASHRC!'"
 )
 
-REM  Append clean export line
 echo export PATH="$PATH:!INSTALL_UNIX!" >> "!BASHRC!"
 call :log [OK] Added !INSTALL_UNIX! to .bashrc for Git Bash.
 echo.
@@ -164,7 +161,17 @@ if !errorlevel! neq 0 (
 ) else (
     call :log [OK] Already in Windows PATH - skipping.
 )
-call :log [INFO] Restart CMD / Git Bash after install to use fancygit.
+echo.
+
+REM  Broadcast PATH change so new terminals see it immediately
+REM  (same signal Windows sends when you edit PATH via System Properties)
+powershell -NoProfile -Command ^
+    "$sig = '[DllImport(\"user32.dll\", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);';" ^
+    "$type = Add-Type -MemberDefinition $sig -Name 'Win32SendMessage' -Namespace 'Win32Functions' -PassThru;" ^
+    "[UIntPtr]$result = [UIntPtr]::Zero;" ^
+    "$type::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$result) | Out-Null"
+call :log [OK] PATH change broadcast - new terminals will see fancygit immediately.
+call :log [INFO] Note: already-open terminals still need to be restarted.
 echo.
 
 
@@ -181,6 +188,8 @@ call :log                      fancygit push origin main
 call :log                      fancygit pull origin main
 call :log =========================================
 call :log  Log saved to: %LOG_FILE%
+echo.
+echo  Open a NEW terminal and run: fancygit status
 echo.
 echo  Press any key to close...
 pause >nul
