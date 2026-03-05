@@ -34,15 +34,17 @@ FancyGit is a CLI wrapper around git commands that:
 
 ### Quick Setup
 
-Run the automated installation script and provide your sudo password:
+Run the automated cross-platform launcher script:
 ```bash
-./start.sh
+python3 launcher.py
 ```
 
 This script will:
+- Automatically detect your operating system (Linux, macOS, or Windows)
+- Run the appropriate installation script for your system
 - Check Python 3.6+ and Git installation
 - Make fancygit.py executable
-- Create system-wide symlink
+- Create system-wide symlink (Unix-like systems) or add to PATH (Windows)
 - Test the installation
 
 ## Usage
@@ -117,12 +119,14 @@ FancyGit CLI → Git Commands → Collect Output → Pattern Matching → User I
 ```
 Fancy_Git/
 ├── fancygit.py          # Main CLI application
-├── start.sh             # Automated installation script
+├── launcher.py          # Cross-platform launcher script
 ├── README.md            # This file
 ├── images/              # Images and documentation
 │   └── overview.png     # Project overview image
 └── .git/                # Git repository
 ```
+
+*Note: Platform-specific installation scripts (`start.sh`, `start.bat`) are included but automatically managed by `launcher.py`.*
 
 ## Requirements
 
