@@ -2,25 +2,11 @@
 import subprocess
 import sys
 import re
-
+from src.git_runner import GitRunner
 class FancyGit:
     def __init__(self):
-        self.git_cmd = "git"
-    
-    def run_git_command(self, args):
-        """Run git command and capture output"""
-        try:
-            cmd = [self.git_cmd] + args
-            result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
-                check=False
-            )
-            return result.returncode, result.stdout, result.stderr
-        except Exception as e:
-            return -1, "", str(e)
-    
+        self.runner = GitRunner()
+
     def detect_warnings_errors(self, stdout, stderr):
         """Detect warnings and errors in git output"""
         warnings = []
@@ -68,10 +54,12 @@ class FancyGit:
         
         return warnings, errors
     
+
+    # REFACTOR THESE FOUR REDUNDANT CODE
     def push(self, *args):
         """Handle git push command"""
         print(f"Running: git push {' '.join(args)}")
-        returncode, stdout, stderr = self.run_git_command(['push'] + list(args))
+        returncode, stdout, stderr = self.runner.run_git_command(['push'] + list(args))
         
         warnings, errors = self.detect_warnings_errors(stdout, stderr)
         
@@ -98,7 +86,7 @@ class FancyGit:
     def pull(self, *args):
         """Handle git pull command"""
         print(f"Running: git pull {' '.join(args)}")
-        returncode, stdout, stderr = self.run_git_command(['pull'] + list(args))
+        returncode, stdout, stderr = self.runner.run_git_command(['pull'] + list(args))
         
         warnings, errors = self.detect_warnings_errors(stdout, stderr)
         
@@ -125,7 +113,7 @@ class FancyGit:
     def add(self, *args):
         """Handle git add command"""
         print(f"Running: git add {' '.join(args)}")
-        returncode, stdout, stderr = self.run_git_command(['add'] + list(args))
+        returncode, stdout, stderr = self.runner.run_git_command(['add'] + list(args))
         
         warnings, errors = self.detect_warnings_errors(stdout, stderr)
         
@@ -152,7 +140,7 @@ class FancyGit:
     def commit(self, *args):
         """Handle git commit command"""
         print(f"Running: git commit {' '.join(args)}")
-        returncode, stdout, stderr = self.run_git_command(['commit'] + list(args))
+        returncode, stdout, stderr = self.runner.run_git_command(['commit'] + list(args))
         
         warnings, errors = self.detect_warnings_errors(stdout, stderr)
         
@@ -175,6 +163,15 @@ class FancyGit:
             else:
                 print("Command cancelled.")
                 return False
+    #-------------------------------------
+
+    
+    def get_repo_state(self):
+        return None
+
+    def parse_conflict(self):
+        return None
+
 
 def main():
     fancy_git = FancyGit()
