@@ -9,14 +9,12 @@ class FancyGit:
         self.runner = GitRunner()
         self.parser = GitErrorParser()
  
-    
 
     # REFACTOR THESE FOUR REDUNDANT CODE
     def push(self, *args):
         """Handle git push command"""
         print(f"Running: git push {' '.join(args)}")
         returncode, stdout, stderr = self.runner.run_git_command(['push'] + list(args))
-        
         warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
         
         if errors:

@@ -1,0 +1,29 @@
+# this class will be an immutable dataclass
+# it will represent like the format of the data so we can then
+# pass it to the ai models so they can be fed a consistent and organized
+# json format that is both readable and can be easily extracted and 
+# worked on
+
+# dataclasses are suitable here because we will primarily use it to store the 
+# data and represent it
+# moreover to make it look cleaner without having to write an init method
+
+
+# the format will be like the following
+# {
+#   "type": "MERGE_CONFLICT",
+#   "message": "error: Merge conflict in README.md",
+#   "severity": "error",
+#   "file": "README.md",
+#   "line": null
+# }
+from dataclasses import dataclass
+
+@dataclass(frozen = True)   # we freeze it to make it immutable
+class GitError:
+    type: str
+    message: str
+    severity: str
+    file: str
+    line: int
+        
