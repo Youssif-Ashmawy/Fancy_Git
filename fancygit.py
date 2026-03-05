@@ -3,56 +3,12 @@ import subprocess
 import sys
 import re
 from src.git_runner import GitRunner
+from src.git_error_parser import GitErrorParser
 class FancyGit:
     def __init__(self):
         self.runner = GitRunner()
-
-    def detect_warnings_errors(self, stdout, stderr):
-        """Detect warnings and errors in git output"""
-        warnings = []
-        errors = []
-        
-        # Common git error patterns
-        error_patterns = [
-            r'error:',
-            r'fatal:',
-            r'failed',
-            r'rejected',
-            r'conflict',
-            r'merge conflict',
-            r'unable to'
-        ]
-        
-        # Common git warning patterns
-        warning_patterns = [
-            r'warning:',
-            r'WARNING:',
-            r'behind',
-            r'ahead',
-            r'diverged'
-        ]
-        
-        # Check stderr for errors
-        for pattern in error_patterns:
-            matches = re.findall(f'{pattern}.*', stderr, re.IGNORECASE)
-            errors.extend(matches)
-        
-        # Check stdout for errors
-        for pattern in error_patterns:
-            matches = re.findall(f'{pattern}.*', stdout, re.IGNORECASE)
-            errors.extend(matches)
-        
-        # Check stderr for warnings
-        for pattern in warning_patterns:
-            matches = re.findall(f'{pattern}.*', stderr, re.IGNORECASE)
-            warnings.extend(matches)
-        
-        # Check stdout for warnings
-        for pattern in warning_patterns:
-            matches = re.findall(f'{pattern}.*', stdout, re.IGNORECASE)
-            warnings.extend(matches)
-        
-        return warnings, errors
+        self.parser = GitErrorParser()
+ 
     
 
     # REFACTOR THESE FOUR REDUNDANT CODE
@@ -61,7 +17,7 @@ class FancyGit:
         print(f"Running: git push {' '.join(args)}")
         returncode, stdout, stderr = self.runner.run_git_command(['push'] + list(args))
         
-        warnings, errors = self.detect_warnings_errors(stdout, stderr)
+        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
         
         if errors:
             print("\n❌ Errors detected:")
@@ -88,7 +44,7 @@ class FancyGit:
         print(f"Running: git pull {' '.join(args)}")
         returncode, stdout, stderr = self.runner.run_git_command(['pull'] + list(args))
         
-        warnings, errors = self.detect_warnings_errors(stdout, stderr)
+        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
         
         if errors:
             print("\n❌ Errors detected:")
@@ -115,7 +71,7 @@ class FancyGit:
         print(f"Running: git add {' '.join(args)}")
         returncode, stdout, stderr = self.runner.run_git_command(['add'] + list(args))
         
-        warnings, errors = self.detect_warnings_errors(stdout, stderr)
+        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
         
         if errors:
             print("\n❌ Errors detected:")
@@ -142,7 +98,7 @@ class FancyGit:
         print(f"Running: git commit {' '.join(args)}")
         returncode, stdout, stderr = self.runner.run_git_command(['commit'] + list(args))
         
-        warnings, errors = self.detect_warnings_errors(stdout, stderr)
+        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
         
         if errors:
             print("\n❌ Errors detected:")
