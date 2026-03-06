@@ -3,8 +3,8 @@
 #  branch="main",
 #  ahead_by=2,
 #  behind_by=1,
-#  staged_files=["parser.py"],
-#  unstaged_files=["cli.py"],
+#  staged_files=["fancygit.py"],
+#  unstaged_files=["git_runner.py"],
 #  untracked_files=["test.py"],
 #  has_conflicts=True
 # )
