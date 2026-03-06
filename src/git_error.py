@@ -28,3 +28,15 @@ class GitError:
     type: str | None = None
     file: str | None = None
     line: int | None = None
+
+    def __str__(self) -> str:
+        return (
+            f"{'='*60}\n"
+            f"type: {self.type}\n"
+            f"source: {self.source}\n"
+            f"message: {self.message}\n"
+            f"severity: {self.severity}\n"
+            f"file: {self.file}\n"
+            f"line: {self.line}\n"
+            f"{'='*60}"
+        )

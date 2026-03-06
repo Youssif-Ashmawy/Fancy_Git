@@ -2,38 +2,45 @@
 import subprocess
 import re
 import sys
+import os
+
+# Add script directory to Python path so imports work from anywhere
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, script_dir)
+
 from src.git_runner import GitRunner
 from src.git_error_parser import GitErrorParser
 class FancyGit:
     def __init__(self):
+        # initialize required components
         self.runner = GitRunner()
         self.parser = GitErrorParser()
  
-
     # REFACTORED
     def _command_handler(self, command, *args):     # private function
         """A Generic git commands handler"""
-        print(f"Running: git push {' '.join(args)}")
+        print(f"Running: git {command} {' '.join(args)}")
 
-        returncode, stdout, stderr = self.runner.run_git_command(['push'] + list(args))
+        returncode, stdout, stderr = self.runner.run_git_command([command] + list(args))
         messages = self.parser.detect_warnings_errors(stdout, stderr)
         
-        for message in messages:
-            if message.severity != 'unknown':
-                if message.severity == 'error':
-                    print("\n❌ Errors detected:")
-                elif message.severity == 'warning':
-                    print("\n⚠️  Warnings detected:")
-                print(message.message)
+        if not messages:        # IF MSGS ARE EMPTY
+            print("\n✅ No warnings or errors detected")
+            response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
+            if response == 'y':
+                print("Command executed successfully!")
+                # return True       # no idea why u did this
             else:
-                print("\n✅ No warnings or errors detected")
-                response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
-                if response == 'y':
-                    print("Command executed successfully!")
-                    # return True       # no idea why u did this
-                else:
-                    print("Command cancelled.")
-                    # return False      # again ill comment it out it has no impact
+                print("Command cancelled.")
+                # return False      # again ill comment it out it has no impact
+        else:
+            for message in messages:
+                if message.severity != 'unknown':
+                    if message.severity == 'error':
+                        print("\n❌ Errors detected:")
+                    elif message.severity == 'warning':
+                        print("\n⚠️  Warnings detected:")
+                    print(message)
 
     def push(self, *args):
         """Handle git push command"""

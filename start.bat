@@ -74,18 +74,25 @@ echo.
 
 
 REM -------------------------------------------------------
-REM  3. COPY fancygit.py FROM INSTALLER DIRECTORY
+REM  3. COPY fancygit.py AND src DIRECTORY FROM INSTALLER
 REM -------------------------------------------------------
-if exist "%INSTALL_DIR%\fancygit.py" (
-    call :log [OK] fancygit.py already present - skipping.
+SET "SCRIPT_DIR=%~dp0"
+
+if exist "!SCRIPT_DIR!fancygit.py" (
+    copy /y "!SCRIPT_DIR!fancygit.py" "%INSTALL_DIR%\fancygit.py" >nul
+    call :log [OK] Copied fancygit.py to installation directory.
 ) else (
-    SET "SCRIPT_DIR=%~dp0"
-    if exist "!SCRIPT_DIR!fancygit.py" (
-        copy /y "!SCRIPT_DIR!fancygit.py" "%INSTALL_DIR%\fancygit.py" >nul
-        call :log [OK] Copied fancygit.py from installer directory.
-    ) else (
-        call :fail [ERROR] fancygit.py not found next to installer. Put both files in the same folder.
+    call :fail [ERROR] fancygit.py not found next to installer. Put both files in the same folder.
+)
+
+if exist "!SCRIPT_DIR!src" (
+    if exist "%INSTALL_DIR%\src" (
+        rmdir /s /q "%INSTALL_DIR%\src" >nul 2>&1
     )
+    xcopy /e /i /y "!SCRIPT_DIR!src" "%INSTALL_DIR%\src" >nul
+    call :log [OK] Copied src directory to installation directory.
+) else (
+    call :fail [ERROR] src directory not found next to installer.
 )
 echo.
 
