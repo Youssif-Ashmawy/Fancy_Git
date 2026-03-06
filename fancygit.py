@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
 import re
+import sys
 from src.git_runner import GitRunner
 from src.git_error_parser import GitErrorParser
 class FancyGit:
@@ -10,113 +10,46 @@ class FancyGit:
         self.parser = GitErrorParser()
  
 
-    # REFACTOR THESE FOUR REDUNDANT CODE
+    # REFACTORED
+    def _command_handler(self, command, *args):     # private function
+        """A Generic git commands handler"""
+        print(f"Running: git push {' '.join(args)}")
+
+        returncode, stdout, stderr = self.runner.run_git_command(['push'] + list(args))
+        messages = self.parser.detect_warnings_errors(stdout, stderr)
+        
+        for message in messages:
+            if message.severity != 'unknown':
+                if message.severity == 'error':
+                    print("\n❌ Errors detected:")
+                elif message.severity == 'warning':
+                    print("\n⚠️  Warnings detected:")
+                print(message.message)
+            else:
+                print("\n✅ No warnings or errors detected")
+                response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
+                if response == 'y':
+                    print("Command executed successfully!")
+                    # return True       # no idea why u did this
+                else:
+                    print("Command cancelled.")
+                    # return False      # again ill comment it out it has no impact
+
     def push(self, *args):
         """Handle git push command"""
-        print(f"Running: git push {' '.join(args)}")
-        returncode, stdout, stderr = self.runner.run_git_command(['push'] + list(args))
-        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
-        
-        if errors:
-            print("\n❌ Errors detected:")
-            for error in errors:
-                print(f"  {error}")
-            return False
-        elif warnings:
-            print("\n⚠️  Warnings detected:")
-            for warning in warnings:
-                print(f"  {warning}")
-            return False
-        else:
-            print("\n✅ No warnings or errors detected")
-            response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
-            if response == 'y':
-                print("Command executed successfully!")
-                return True
-            else:
-                print("Command cancelled.")
-                return False
+        self._command_handler('push', *args)
     
     def pull(self, *args):
         """Handle git pull command"""
-        print(f"Running: git pull {' '.join(args)}")
-        returncode, stdout, stderr = self.runner.run_git_command(['pull'] + list(args))
-        
-        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
-        
-        if errors:
-            print("\n❌ Errors detected:")
-            for error in errors:
-                print(f"  {error}")
-            return False
-        elif warnings:
-            print("\n⚠️  Warnings detected:")
-            for warning in warnings:
-                print(f"  {warning}")
-            return False
-        else:
-            print("\n✅ No warnings or errors detected")
-            response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
-            if response == 'y':
-                print("Command executed successfully!")
-                return True
-            else:
-                print("Command cancelled.")
-                return False
+        self._command_handler('pull', *args)
 
     def add(self, *args):
         """Handle git add command"""
-        print(f"Running: git add {' '.join(args)}")
-        returncode, stdout, stderr = self.runner.run_git_command(['add'] + list(args))
-        
-        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
-        
-        if errors:
-            print("\n❌ Errors detected:")
-            for error in errors:
-                print(f"  {error}")
-            return False
-        elif warnings:
-            print("\n⚠️  Warnings detected:")
-            for warning in warnings:
-                print(f"  {warning}")
-            return False
-        else:
-            print("\n✅ No warnings or errors detected")
-            response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
-            if response == 'y':
-                print("Command executed successfully!")
-                return True
-            else:
-                print("Command cancelled.")
-                return False
+        self._command_handler('add', *args)
     
     def commit(self, *args):
         """Handle git commit command"""
-        print(f"Running: git commit {' '.join(args)}")
-        returncode, stdout, stderr = self.runner.run_git_command(['commit'] + list(args))
-        
-        warnings, errors = self.parser.detect_warnings_errors(stdout, stderr)
-        
-        if errors:
-            print("\n❌ Errors detected:")
-            for error in errors:
-                print(f"  {error}")
-            return False
-        elif warnings:
-            print("\n⚠️  Warnings detected:")
-            for warning in warnings:
-                print(f"  {warning}")
-            return False
-        else:
-            print("\n✅ No warnings or errors detected")
-            response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
-            if response == 'y':
-                print("Command executed successfully!")
-                return True
-            else:
-                print("Command cancelled.")
-                return False
+        self._command_handler('commit', *args)
     #-------------------------------------
 
     
