@@ -12,18 +12,19 @@
 # the format will be like the following
 # {
 #   "type": "MERGE_CONFLICT",
+#   "source" : stdout || stderr
 #   "message": "error: Merge conflict in README.md",
-#   "severity": "error",
+#   "severity": "error" || "warning",
 #   "file": "README.md",
 #   "line": null
 # }
 from dataclasses import dataclass
-
 @dataclass(frozen = True)   # we freeze it to make it immutable
 class GitError:
-    type: str
+    source: str 
     message: str
-    severity: str
-    file: str
-    line: int
-        
+    severity: str = "unknown"
+    
+    type: str | None = None
+    file: str | None = None
+    line: int | None = None

@@ -1,13 +1,17 @@
 import re
-
+from src.git_error import GitError
 class GitErrorParser:
     def __init__(self) -> None:
         pass
 
     def detect_warnings_errors(self, stdout, stderr):
         """Detect warnings and errors in git output"""
-        warnings = []
-        errors = []
+        messages = []
+
+        def scan_patterns(patterns, text, type, source):
+            for pattern in patterns:
+                for match in re.findall(f'{pattern}.*', text, re.IGNORECASE):
+                    messages.append(GitError(severity = type, source=source, message=match))
         
         # Common git error patterns
         error_patterns = [
@@ -28,25 +32,10 @@ class GitErrorParser:
             r'ahead',
             r'diverged'
         ]
-        
-        # Check stderr for errors
-        for pattern in error_patterns:
-            matches = re.findall(f'{pattern}.*', stderr, re.IGNORECASE)
-            errors.extend(matches)
-        
-        # Check stdout for errors
-        for pattern in error_patterns:
-            matches = re.findall(f'{pattern}.*', stdout, re.IGNORECASE)
-            errors.extend(matches)
-        
-        # Check stderr for warnings
-        for pattern in warning_patterns:
-            matches = re.findall(f'{pattern}.*', stderr, re.IGNORECASE)
-            warnings.extend(matches)
-        
-        # Check stdout for warnings
-        for pattern in warning_patterns:
-            matches = re.findall(f'{pattern}.*', stdout, re.IGNORECASE)
-            warnings.extend(matches)
-        
-        return warnings, errors
+
+        scan_patterns(error_patterns, stdout, "error", "stdout")
+        scan_patterns(warning_patterns, stdout, "warning", "stdout")
+        scan_patterns(error_patterns, stderr, "error", "stderr")
+        scan_patterns(warning_patterns, stderr, "warning", "stderr")
+
+        return messages
