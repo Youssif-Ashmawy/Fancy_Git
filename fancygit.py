@@ -106,37 +106,26 @@ class FancyGit:
         """A Generic git commands handler"""
         print(f"Running: git {command} {' '.join(args)}")
 
+        # Show confirmation before executing the command
+        if self.confirmation_enabled:
+            response = input(f"Execute 'git {command} {' '.join(args)}'? [y/N]: ").strip().lower()
+            if response != 'y':
+                print("Command cancelled.")
+                return False
+
+        # Execute the command
         returncode, stdout, stderr = self.runner.run_git_command([command] + list(args))
         messages = self.parser.detect_warnings_errors(stdout, stderr)
         
         if not messages:        # IF MSGS ARE EMPTY
             print("\n✅ No warnings or errors detected")
-            
-            if self.confirmation_enabled:
-                response = input("No warning messages - enter 'y' to run the command: ").strip().lower()
-                if response == 'y':
-                    # Execute the command again to get actual output
-                    returncode, stdout, stderr = self.runner.run_git_command([command] + list(args))
-                    if stdout:
-                        print(stdout)
-                    if stderr:
-                        print(stderr)
-                    if not stdout and not stderr:
-                        print("Command executed successfully!")
-                    return True
-                else:
-                    print("Command cancelled.")
-                    return False
-            else:
-                # Execute the command directly without confirmation
-                returncode, stdout, stderr = self.runner.run_git_command([command] + list(args))
-                if stdout:
-                    print(stdout)
-                if stderr:
-                    print(stderr)
-                if not stdout and not stderr:
-                    print("Command executed successfully!")
-                return True
+            if stdout:
+                print(stdout)
+            if stderr:
+                print(stderr)
+            if not stdout and not stderr:
+                print("Command executed successfully!")
+            return True
         else:
             for message in messages:
                 if message.severity != 'unknown':
