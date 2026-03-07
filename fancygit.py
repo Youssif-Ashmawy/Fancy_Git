@@ -150,7 +150,67 @@ class FancyGit:
 
     
     def get_repo_state(self):
-        return None
+        """Get the current state of the git repository
+        
+        Returns:
+            dict: Repository state information including:
+                - branch: Current branch name
+                - staged: List of staged files
+                - modified: List of modified files
+                - untracked: List of untracked files
+                - conflicts: List of files in conflict
+                - clean: Boolean indicating if working directory is clean
+                - ahead: Number of commits ahead of remote
+                - behind: Number of commits behind remote
+        """
+        repo_state = {
+            'branch': None,
+            'staged': [],
+            'modified': [],
+            'untracked': [],
+            'conflicts': [],
+            'clean': False,
+            'ahead': 0,
+            'behind': 0
+        }
+        
+        # Get current branch
+        returncode, stdout, stderr = self.runner.run_git_command(['branch', '--show-current'])
+        if returncode == 0 and stdout:
+            repo_state['branch'] = stdout.strip()
+        
+        # Get porcelain status for parsing
+        returncode, stdout, stderr = self.runner.run_git_command(['status', '--porcelain'])
+        if returncode == 0 and stdout:
+            for line in stdout.strip().split('\n'):
+                if line.strip():
+                    status = line[:2]
+                    file_path = line[2:].strip()  # Skip 2 chars and strip whitespace
+                    
+                    if status == 'UU':
+                        repo_state['conflicts'].append(file_path)
+                    elif status[0] in ['A', 'M', 'D', 'R', 'C']:
+                        repo_state['staged'].append(file_path)
+                    elif status[1] in ['M', 'D']:
+                        repo_state['modified'].append(file_path)
+                    elif status == '??':
+                        repo_state['untracked'].append(file_path)
+        
+        # Check if working directory is clean
+        repo_state['clean'] = (not repo_state['staged'] and 
+                              not repo_state['modified'] and 
+                              not repo_state['untracked'] and 
+                              not repo_state['conflicts'])
+        
+        # Get ahead/behind information
+        returncode, stdout, stderr = self.runner.run_git_command(['rev-list', '--count', '--left-right', f'@{{u}}...HEAD'])
+        if returncode == 0 and stdout:
+            counts = stdout.strip().split('\t')
+            if len(counts) == 2:
+                repo_state['behind'] = int(counts[0])
+                repo_state['ahead'] = int(counts[1])
+        
+        return repo_state
 
     def parse_conflict(self):
         return None
