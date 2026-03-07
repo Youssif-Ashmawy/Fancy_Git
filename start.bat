@@ -81,6 +81,12 @@ SET "SCRIPT_DIR=%~dp0"
 if exist "!SCRIPT_DIR!fancygit.py" (
     copy /y "!SCRIPT_DIR!fancygit.py" "%INSTALL_DIR%\fancygit.py" >nul
     call :log [OK] Copied fancygit.py to installation directory.
+    if exist "!SCRIPT_DIR!welcome.py" (
+    copy /y "!SCRIPT_DIR!welcome.py" "%INSTALL_DIR%\welcome.py" >nul
+    call :log [OK] Copied welcome.py
+) else (
+    call :log [WARN] welcome.py not found next to installer.
+)
 ) else (
     call :fail [ERROR] fancygit.py not found next to installer. Put both files in the same folder.
 )
