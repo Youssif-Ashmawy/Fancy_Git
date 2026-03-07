@@ -5,6 +5,7 @@ import sys
 import os
 from src.git_runner import GitRunner
 from src.git_error_parser import GitErrorParser
+from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
 # Add script directory to Python path so imports work from anywhere
