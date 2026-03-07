@@ -9,6 +9,12 @@ import platform
 import subprocess
 import sys
 
+# Add script directory to Python path so imports work from anywhere
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, script_dir)
+
+from welcome import show_welcome
+
 
 def detect_os():
     """Detect the current operating system."""
@@ -42,7 +48,7 @@ def run_script(script_name):
             # For Windows
             subprocess.run([script_path], check=True, shell=True)
         
-        print(f"✅ {script_name} completed successfully")
+        # print(f"✅ {script_name} completed successfully")
         return True
         
     except subprocess.CalledProcessError as e:
@@ -61,17 +67,22 @@ def main():
     
     if os_type == "linux":
         print("✅ Linux detected")
-        run_script("start.sh")
+        success = run_script("start.sh")
     elif os_type == "macos":
         print("✅ macOS detected")
-        run_script("start.sh")
+        success = run_script("start.sh")
     elif os_type == "windows":
         print("✅ Windows detected")
-        run_script("start.bat")
+        success = run_script("start.bat")
     else:
         print(f"❌ Unsupported operating system: {platform.system()}")
         print("Supported systems: Linux, macOS, Windows")
         sys.exit(1)
+    
+    # Show welcome message if installation was successful
+    if success:
+        # print("\n🎉 FancyGit installation completed successfully!")
+        show_welcome()
 
 
 if __name__ == "__main__":

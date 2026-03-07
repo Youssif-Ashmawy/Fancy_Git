@@ -42,4 +42,5 @@ status
 submodule
 switch
 tag
+welcome
 worktree

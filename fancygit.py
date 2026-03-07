@@ -88,6 +88,11 @@ class FancyGit:
             print(f"Available commands: {', '.join(self.available_commands)}")
             return False
         
+        # Handle welcome command
+        if command == 'welcome':
+            show_welcome()
+            return True
+        
         # Handle confirmation command specially
         if command == 'confirmation':
             if args:

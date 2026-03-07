@@ -55,7 +55,7 @@ fi
 # Test the installation
 echo "🧪 Testing installation..."
 if command -v fancygit &> /dev/null; then
-    echo "✅ FancyGit is now available system-wide!"
+    echo "🎉 Installation complete! You can now use FancyGit from anywhere."
     echo ""
     echo "📖 Usage examples:"
     echo "  fancygit add ."
@@ -63,7 +63,6 @@ if command -v fancygit &> /dev/null; then
     echo "  fancygit push origin main"
     echo "  fancygit pull origin main"
     echo ""
-    echo "🎉 Installation complete! You can now use FancyGit from anywhere."
 else
     echo "❌ Installation verification failed"
     exit 1
