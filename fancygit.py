@@ -3,13 +3,22 @@ import subprocess
 import re
 import sys
 import os
+from src.git_runner import GitRunner
+from src.git_error_parser import GitErrorParser
 
+#region LAUNCHER RELATED IMPORTS
 # Add script directory to Python path so imports work from anywhere
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, script_dir)
 
-from src.git_runner import GitRunner
-from src.git_error_parser import GitErrorParser
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+
+COMMAND_FILE = BASE_DIR / "command-list.txt"
+CONFIG_FILE = BASE_DIR / ".fancygit_config"
+#endregion
+
 class FancyGit:
     def __init__(self):
         # initialize required components

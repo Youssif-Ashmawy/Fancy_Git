@@ -96,6 +96,23 @@ if exist "!SCRIPT_DIR!src" (
 )
 echo.
 
+REM -------------------------------------------------------
+REM  3b. COPY CONFIG FILES
+REM -------------------------------------------------------
+if exist "!SCRIPT_DIR!command-list.txt" (
+    copy /y "!SCRIPT_DIR!command-list.txt" "%INSTALL_DIR%\command-list.txt" >nul
+    call :log [OK] Copied command-list.txt
+) else (
+    call :log [WARN] command-list.txt not found next to installer.
+)
+
+if exist "!SCRIPT_DIR!.fancygit_config" (
+    copy /y "!SCRIPT_DIR!.fancygit_config" "%INSTALL_DIR%\.fancygit_config" >nul
+    call :log [OK] Copied .fancygit_config
+) else (
+    call :log [WARN] .fancygit_config not found next to installer.
+)
+echo.
 
 REM -------------------------------------------------------
 REM  4a. CREATE WINDOWS LAUNCHER  (fancygit.bat)
