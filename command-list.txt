@@ -44,3 +44,4 @@ switch
 tag
 welcome
 worktree
+visualize

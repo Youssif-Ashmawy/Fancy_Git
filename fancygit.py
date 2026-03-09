@@ -3,8 +3,10 @@ import subprocess
 import re
 import sys
 import os
+import webbrowser
 from src.git_runner import GitRunner
 from src.git_error_parser import GitErrorParser
+from src.mermaid_export import MermaidExporter
 from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -25,6 +27,7 @@ class FancyGit:
         # initialize required components
         self.runner = GitRunner()
         self.parser = GitErrorParser()
+        self.mermaid = MermaidExporter(self.runner)
         self.available_commands = self._load_commands()
         self.confirmation_enabled = self._load_confirmation_state()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
@@ -113,6 +116,37 @@ class FancyGit:
                     return False
             else:
                 return self.toggle_confirmation()
+
+        # Mermaid repo visualization
+        if command == 'visualize':
+            output_dir = args[0] if len(args) >= 1 else os.path.join(os.getcwd(), '.fancygit')
+            max_commits = 40
+            open_browser = True
+
+            for a in args[1:]:
+                if a.startswith('--max-commits='):
+                    try:
+                        max_commits = int(a.split('=', 1)[1])
+                    except ValueError:
+                        print("Invalid --max-commits value")
+                        return False
+                elif a == '--no-open':
+                    open_browser = False
+
+            try:
+                repo_state = self.get_repo_state()
+                paths = self.mermaid.export_all(output_dir=output_dir, repo_state=repo_state, max_commits=max_commits)
+                print("Mermaid export created:")
+                print(f"  Status: {paths['status_mmd']}")
+                print(f"  Graph : {paths['graph_mmd']}")
+                print(f"  HTML  : {paths['html']}")
+
+                if open_browser:
+                    webbrowser.open(f"file://{paths['html']}")
+                return True
+            except Exception as e:
+                print(f"Failed to visualize repo: {e}")
+                return False
         
         return self._command_handler(command, *args)
  
