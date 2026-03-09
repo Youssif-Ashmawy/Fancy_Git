@@ -29,12 +29,35 @@ class MermaidExporter:
     def _escape_label(self, value: str) -> str:
         return value.replace('"', "'")
 
+    def _parse_gitignore(self, repo_root: str) -> set[str]:
+        """Parse .gitignore file and return a set of patterns to ignore"""
+        gitignore_path = os.path.join(repo_root, '.gitignore')
+        ignore_patterns = set()
+        
+        if os.path.exists(gitignore_path):
+            with open(gitignore_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        continue
+                    # Remove trailing slashes for directory matching
+                    if line.endswith('/'):
+                        line = line[:-1]
+                    ignore_patterns.add(line)
+        
+        # Always add these essential directories for safety
+        ignore_patterns.update({'.git', '__pycache__', '.venv', 'venv', 'node_modules', '.fancygit'})
+        return ignore_patterns
+
     def _discover_python_files(self, repo_root: str) -> list[str]:
         out: list[str] = []
+        ignore_patterns = self._parse_gitignore(repo_root)
+        
         for root, dirs, files in os.walk(repo_root):
             dirs[:] = [
                 d for d in dirs
-                if d not in {'.git', '__pycache__', '.venv', 'venv', 'node_modules', '.fancygit'}
+                if d not in ignore_patterns
             ]
 
             for fn in files:
@@ -118,9 +141,10 @@ class MermaidExporter:
 
     def repo_file_structure_flowchart(self, repo_root: str, max_nodes: int = 250) -> str:
         lines = ['flowchart TB']
+        ignore_patterns = self._parse_gitignore(repo_root)
 
         def skip_dir(name: str) -> bool:
-            return name in {'.git', '__pycache__', '.venv', 'venv', 'node_modules', '.fancygit'}
+            return name in ignore_patterns
 
         root_id = 'repo_root'
         root_label = self._escape_label(os.path.basename(os.path.abspath(repo_root)) or 'repo')
@@ -241,10 +265,10 @@ class MermaidExporter:
                 msg = 'Unable to read git log'
             raise RuntimeError(msg)
 
-        lines = ['gitGraph']
+        lines = ['flowchart TD']
 
-        # Best-effort: render a single mainline since gitGraph can’t express the full DAG
-        # without complex modeling. We still include decorations (branches/tags) in labels.
+        # Use flowchart for vertical layout to improve commit readability
+        commits = []
         for raw in stdout.splitlines():
             parts = raw.split('\x1f')
             if len(parts) != 5:
@@ -254,7 +278,18 @@ class MermaidExporter:
             if decos.strip():
                 label = f'{label} {decos.strip()}'
             label = self._escape_label(label)
-            lines.append(f'  commit id: "{label}"')
+            commits.append((short, label))
+
+        # Create nodes for each commit
+        for i, (short, label) in enumerate(commits):
+            node_id = self._sanitize_node_id(f'commit_{short}')
+            lines.append(f'  {node_id}["{label}"]')
+
+        # Create vertical connections between commits
+        for i in range(len(commits) - 1):
+            current_id = self._sanitize_node_id(f'commit_{commits[i][0]}')
+            next_id = self._sanitize_node_id(f'commit_{commits[i+1][0]}')
+            lines.append(f'  {current_id} --> {next_id}')
 
         return '\n'.join(lines) + '\n'
 

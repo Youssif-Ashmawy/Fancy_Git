@@ -139,6 +139,8 @@ class FancyGit:
                 print("Mermaid export created:")
                 print(f"  Status: {paths['status_mmd']}")
                 print(f"  Graph : {paths['graph_mmd']}")
+                print(f"  Tree  : {paths['tree_mmd']}")
+                print(f"  Deps  : {paths['deps_mmd']}")
                 print(f"  HTML  : {paths['html']}")
 
                 if open_browser:
