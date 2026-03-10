@@ -174,19 +174,27 @@ class FancyGit:
                 return False
         # Mermaid repo visualization
         if command == 'visualize':
-            output_dir = args[0] if len(args) >= 1 else os.path.join(os.getcwd(), '.fancygit')
+            output_dir = os.path.join(os.getcwd(), '.fancygit')
             max_commits = 40
             open_browser = True
-
-            for a in args[1:]:
-                if a.startswith('--max-commits='):
+            
+            # Parse arguments properly
+            i = 0
+            while i < len(args):
+                arg = args[i]
+                if arg.startswith('--max-commits='):
                     try:
-                        max_commits = int(a.split('=', 1)[1])
+                        max_commits = int(arg.split('=', 1)[1])
                     except ValueError:
                         print("Invalid --max-commits value")
                         return False
-                elif a == '--no-open':
+                elif arg == '--no-open':
                     open_browser = False
+                elif not arg.startswith('--'):
+                    # This is the output directory (positional argument)
+                    # Automatically prefix with '.' to make it hidden
+                    output_dir = '.' + arg if not arg.startswith('.') else arg
+                i += 1
 
             try:
                 repo_state = self.get_repo_state()
@@ -199,7 +207,9 @@ class FancyGit:
                 print(f"  HTML  : {paths['html']}")
 
                 if open_browser:
-                    webbrowser.open(f"file://{paths['html']}")
+                    # Convert to absolute path for browser
+                    html_path = os.path.abspath(paths['html'])
+                    webbrowser.open(f"file://{html_path}")
                 return True
             except Exception as e:
                 print(f"Failed to visualize repo: {e}")
