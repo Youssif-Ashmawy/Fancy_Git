@@ -21,6 +21,7 @@ grep
 gui
 history
 init
+insights
 log
 maintenance
 merge

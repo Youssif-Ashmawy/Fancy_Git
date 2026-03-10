@@ -7,6 +7,7 @@ import webbrowser
 from src.git_runner import GitRunner
 from src.git_error_parser import GitErrorParser
 from src.mermaid_export import MermaidExporter
+from src.git_insights import GitInsights
 from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -28,6 +29,7 @@ class FancyGit:
         self.runner = GitRunner()
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
+        self.insights = GitInsights(self.runner)
         self.available_commands = self._load_commands()
         self.confirmation_enabled = self._load_confirmation_state()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
@@ -117,6 +119,59 @@ class FancyGit:
             else:
                 return self.toggle_confirmation()
 
+        # Handle insights command
+        if command == 'insights':
+            days = 30  # default
+            output_format = 'console'  # default
+            output_file = None
+            
+            # Parse arguments
+            i = 0
+            while i < len(args):
+                arg = args[i]
+                if arg.startswith('--days='):
+                    try:
+                        days = int(arg.split('=', 1)[1])
+                    except ValueError:
+                        print("Invalid --days value")
+                        return False
+                elif arg.startswith('--format='):
+                    output_format = arg.split('=', 1)[1].lower()
+                    if output_format not in ['console', 'json']:
+                        print("Invalid format. Use 'console' or 'json'")
+                        return False
+                elif arg.startswith('--output='):
+                    output_file = arg.split('=', 1)[1]
+                elif arg == '--help':
+                    print("Git Insights Command")
+                    print("Usage: insights [--days=N] [--format=console|json] [--output=filename]")
+                    print("  --days=N        : Analysis period in days (default: 30)")
+                    print("  --format=...   : Output format (default: console)")
+                    print("  --output=...   : Save to file (optional)")
+                    print("  --help         : Show this help")
+                    return True
+                i += 1
+            
+            try:
+                report = self.insights.generate_insights_report(days)
+                
+                if output_format == 'json':
+                    import json
+                    output = json.dumps(report, indent=2)
+                else:
+                    output = self._format_insights_console(report)
+                
+                if output_file:
+                    with open(output_file, 'w') as f:
+                        f.write(output)
+                    print(f"Insights report saved to: {output_file}")
+                else:
+                    print(output)
+                
+                return True
+            except Exception as e:
+                print(f"Failed to generate insights: {e}")
+                return False
         # Mermaid repo visualization
         if command == 'visualize':
             output_dir = args[0] if len(args) >= 1 else os.path.join(os.getcwd(), '.fancygit')
@@ -251,6 +306,84 @@ class FancyGit:
                 repo_state['ahead'] = int(counts[1])
         
         return repo_state
+
+    def _format_insights_console(self, report):
+        """Format insights report for console display"""
+        output = []
+        output.append("=" * 60)
+        output.append("🔍 GIT INSIGHTS REPORT")
+        output.append("=" * 60)
+        output.append(f"Generated: {report['generated_at'][:19]}")
+        output.append(f"Analysis Period: {report['analysis_period_days']} days")
+        output.append("")
+        
+        # Summary
+        summary = report['summary']
+        output.append("📊 SUMMARY")
+        output.append("-" * 30)
+        output.append(f"Total Commits: {summary['total_commits']}")
+        output.append(f"Active Contributors: {summary['active_contributors']}")
+        output.append(f"Active Branches: {summary['active_branches']}/{summary['total_branches']}")
+        output.append(f"Files Changed: {summary['total_files_changed']}")
+        output.append("")
+        
+        # Commit Frequency
+        output.append("📈 COMMIT FREQUENCY")
+        output.append("-" * 40)
+        commit_freq = report['commit_frequency']
+        if commit_freq:
+            for author, count in sorted(commit_freq.items(), key=lambda x: x[1], reverse=True)[:10]:
+                output.append(f"{author:20} : {count:3} commits")
+        else:
+            output.append("No commits found in the specified period")
+        output.append("")
+        
+        # Branch Analysis
+        output.append("🌿 BRANCH ANALYSIS")
+        output.append("-" * 30)
+        branches = report['branch_analysis']
+        local_count = sum(1 for b in branches.values() if b['type'] == 'local')
+        remote_count = sum(1 for b in branches.values() if b['type'] == 'remote')
+        active_count = sum(1 for b in branches.values() if b['status'] == 'active')
+        stale_count = len(branches) - active_count
+        output.append(f"Local: {local_count}, Remote: {remote_count}")
+        output.append(f"Active: {active_count}, Stale: {stale_count}")
+        
+        for branch, info in list(branches.items())[:12]:
+            status_icon = "🟢" if info['status'] == 'active' else "🔴"
+            type_icon = "🏠" if info['type'] == 'local' else "☁️"
+            # Show full branch name without truncation
+            output.append(f"{status_icon}{type_icon} {branch:25} ({info['days_inactive']} days)")
+        output.append("")
+        
+        # File Hotspots
+        output.append("🔥 FILE HOTSPOTS")
+        output.append("-" * 30)
+        hotspots = report['file_hotspots']
+        if hotspots:
+            for file_path, count in sorted(hotspots.items(), key=lambda x: x[1], reverse=True)[:10]:
+                # Truncate long file paths
+                file_name = file_path[:25] + "..." if len(file_path) > 25 else file_path
+                output.append(f"{file_name:28} : {count:3} changes")
+        else:
+            output.append("No file changes found in the specified period")
+        output.append("")
+        
+        # Top Contributors
+        output.append("👥 TOP CONTRIBUTORS")
+        output.append("-" * 30)
+        contributors = report['contributor_stats']
+        top_contributors = sorted(contributors.items(), 
+                                key=lambda x: x[1]['commits'], reverse=True)[:5]
+        
+        for name, stats in top_contributors:
+            # Truncate long names
+            author_name = name[:18] + "..." if len(name) > 18 else name
+            output.append(f"{author_name:18} : {stats['commits']:3} commits, "
+                        f"+{stats['lines_added']} / -{stats['lines_removed']} lines")
+        
+        output.append("=" * 60)
+        return "\n".join(output)
 
     def parse_conflict(self):
         return None
