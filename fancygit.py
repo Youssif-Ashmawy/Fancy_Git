@@ -6,6 +6,7 @@ import os
 import webbrowser
 from src.git_runner import GitRunner
 from src.git_error_parser import GitErrorParser
+from src.git_error import GitError
 from src.mermaid_export import MermaidExporter
 from src.git_insights import GitInsights
 from welcome import show_welcome
@@ -415,8 +416,73 @@ class FancyGit:
         output.append("=" * 60)
         return "\n".join(output)
 
-    def parse_conflict(self):
-        return None
+    def conflict_parser(self):
+        """Parse conflict markers in files that have merge conflicts
+        
+        Returns:
+            list: List of GitError objects representing conflict markers found
+        """
+        conflicts = []
+        
+        # Get current repository state to identify files with conflicts
+        repo_state = self.get_repo_state()
+        conflict_files = repo_state.get('conflicts', [])
+        
+        if not conflict_files:
+            return conflicts
+        
+        # Conflict marker patterns
+        conflict_markers = [
+            (r'^<<<<<<< (.+)$', 'CONFLICT_START'),
+            (r'^=======\s*$', 'CONFLICT_SEPARATOR'),
+            (r'^>>>>>>> (.+)$', 'CONFLICT_END')
+        ]
+        
+        for file_path in conflict_files:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    lines = f.readlines()
+                
+                for line_num, line in enumerate(lines, 1):
+                    for pattern, conflict_type in conflict_markers:
+                        match = re.match(pattern, line.strip())
+                        if match:
+                            # Extract additional info from match if available
+                            additional_info = match.group(1) if match.groups() else None
+                            
+                            error = GitError(
+                                source='file_content',
+                                message=f"Conflict marker '{conflict_type}' found in {file_path}",
+                                severity='error',
+                                type='MERGE_CONFLICT',
+                                file=file_path,
+                                line=line_num
+                            )
+                            conflicts.append(error)
+                            
+            except FileNotFoundError:
+                # File might have been deleted during merge
+                error = GitError(
+                    source='file_system',
+                    message=f"Conflict file not found: {file_path}",
+                    severity='error',
+                    type='MERGE_CONFLICT',
+                    file=file_path,
+                    line=None
+                )
+                conflicts.append(error)
+            except Exception as e:
+                error = GitError(
+                    source='file_system',
+                    message=f"Error reading conflict file {file_path}: {str(e)}",
+                    severity='error',
+                    type='MERGE_CONFLICT',
+                    file=file_path,
+                    line=None
+                )
+                conflicts.append(error)
+        
+        return conflicts
 
 
 def main():
