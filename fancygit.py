@@ -190,6 +190,26 @@ class FancyGit:
                         return False
                 elif arg == '--no-open':
                     open_browser = False
+                elif arg == '--help':
+                    print("Git Repository Visualization Command")
+                    print("Usage: visualize [directory] [options]")
+                    print("")
+                    print("Arguments:")
+                    print("  directory        : Output directory (default: .fancygit)")
+                    print("                   Automatically prefixed with '.' to make hidden")
+                    print("")
+                    print("Options:")
+                    print("  --max-commits=N  : Maximum number of commits to include (default: 40)")
+                    print("  --no-open        : Don't open HTML in browser automatically")
+                    print("  --help           : Show this help message")
+                    print("")
+                    print("Examples:")
+                    print("  visualize                    # Use default settings")
+                    print("  visualize my_output           # Create .my_output directory")
+                    print("  visualize --max-commits=20    # Limit to 20 commits")
+                    print("  visualize --no-open           # Don't open browser")
+                    print("  visualize test --max-commits=10 # Create .test with 10 commits")
+                    return True
                 elif not arg.startswith('--'):
                     # This is the output directory (positional argument)
                     # Automatically prefix with '.' to make it hidden
