@@ -19,7 +19,6 @@
 #   "line": null
 # }
 from dataclasses import dataclass
-from __future__ import annotations
 
 @dataclass(frozen = True)   # we freeze it to make it immutable
 class GitError:
