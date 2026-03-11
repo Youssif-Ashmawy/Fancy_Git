@@ -5,4 +5,3 @@ __pycache__/
 *.pyo
 .fancygit/
 .venv/
-src/__pycache__/
