@@ -9,6 +9,8 @@ from src.git_error_parser import GitErrorParser
 from src.git_error import GitError
 from src.mermaid_export import MermaidExporter
 from src.git_insights import GitInsights
+from src.ollama_client import OllamaClient
+from src.loading_animation import LoadingContext
 from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -31,8 +33,11 @@ class FancyGit:
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
         self.insights = GitInsights(self.runner)
+        self.ollama = OllamaClient()
         self.available_commands = self._load_commands()
         self.confirmation_enabled = self._load_confirmation_state()
+        self.ai_analysis_enabled = self._load_ai_analysis_state()
+        self.loading_animation_type = self._load_animation_type()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
     
     def _load_commands(self):
@@ -58,11 +63,40 @@ class FancyGit:
             pass
         return True  # Default to enabled
     
+    def _load_ai_analysis_state(self):
+        """Load AI analysis state from config file"""
+        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
+        try:
+            with open(config_file, 'r') as f:
+                for line in f:
+                    if line.startswith('ai_analysis_enabled='):
+                        return line.strip().split('=')[1].lower() == 'true'
+        except FileNotFoundError:
+            pass
+        return True  # Default to enabled
+    
+    def _load_animation_type(self):
+        """Load loading animation type from config file"""
+        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
+        try:
+            with open(config_file, 'r') as f:
+                for line in f:
+                    if line.startswith('loading_animation='):
+                        anim_type = line.strip().split('=')[1].strip()
+                        valid_types = ['run', 'dots', 'progress', 'matrix', 'brain']
+                        if anim_type in valid_types:
+                            return anim_type
+        except FileNotFoundError:
+            pass
+        return 'dots'  # Default to dots animation
+    
     def _save_confirmation_state(self):
         """Save confirmation state to config file"""
         try:
             with open(self.config_file, 'w') as f:
                 f.write(f'confirmation_enabled={self.confirmation_enabled}\n')
+                f.write(f'ai_analysis_enabled={self.ai_analysis_enabled}\n')
+                f.write(f'loading_animation={self.loading_animation_type}\n')
         except Exception as e:
             print(f"Warning: Could not save confirmation state: {e}")
     
@@ -87,6 +121,56 @@ class FancyGit:
         status = "enabled" if self.confirmation_enabled else "disabled"
         print(f"Confirmation messages {status}")
         return self.confirmation_enabled
+    
+    def toggle_ai_analysis(self, enable=None):
+        """Toggle AI analysis of error messages
+        
+        Args:
+            enable (bool, optional): If True, enable AI analysis. If False, disable AI analysis.
+                                    If None, toggle current state.
+        
+        Returns:
+            bool: Current AI analysis state
+        """
+        if enable is None:
+            self.ai_analysis_enabled = not self.ai_analysis_enabled
+        else:
+            self.ai_analysis_enabled = enable
+        
+        # Save the state to file
+        self._save_confirmation_state()
+        
+        status = "enabled" if self.ai_analysis_enabled else "disabled"
+        print(f"AI error analysis {status}")
+        
+        # Check Ollama connection when enabling
+        if self.ai_analysis_enabled and not self.ollama.test_connection():
+            print("⚠️  Warning: Cannot connect to Ollama. Make sure Ollama is running on localhost:11434")
+            print("   Install Ollama from https://ollama.ai/ and run 'ollama serve'")
+            self.ai_analysis_enabled = False
+            self._save_confirmation_state()
+            return False
+        
+        return self.ai_analysis_enabled
+    
+    def set_loading_animation(self, animation_type):
+        """Set the loading animation type
+        
+        Args:
+            animation_type (str): Type of animation ('run', 'dots', 'progress', 'matrix', 'brain')
+        
+        Returns:
+            bool: True if animation type was set successfully, False otherwise
+        """
+        valid_types = ['run', 'dots', 'progress', 'matrix', 'brain']
+        if animation_type in valid_types:
+            self.loading_animation_type = animation_type
+            self._save_confirmation_state()
+            print(f"Loading animation set to: {animation_type}")
+            return True
+        else:
+            print(f"Invalid animation type. Valid options: {', '.join(valid_types)}")
+            return False
     
     def execute_command(self, command, *args):
         """Unified dynamic command executor"""
@@ -119,6 +203,64 @@ class FancyGit:
                     return False
             else:
                 return self.toggle_confirmation()
+        
+        # Handle AI analysis command
+        if command == 'ai':
+            if args:
+                arg = args[0].lower()
+                if arg in ['on', 'enable', 'true', '1']:
+                    return self.toggle_ai_analysis(True)
+                elif arg in ['off', 'disable', 'false', '0']:
+                    return self.toggle_ai_analysis(False)
+                elif arg in ['toggle', 'switch']:
+                    return self.toggle_ai_analysis()
+                elif arg in ['status', 'check']:
+                    status = "enabled" if self.ai_analysis_enabled else "disabled"
+                    print(f"AI error analysis is {status}")
+                    if self.ai_analysis_enabled:
+                        if self.ollama.test_connection():
+                            models = self.ollama.get_available_models()
+                            print(f"Using model: {self.ollama.model}")
+                            if models:
+                                print(f"Available models: {', '.join(models[:5])}")
+                        else:
+                            print("⚠️  Ollama is not connected")
+                    print(f"Loading animation: {self.loading_animation_type}")
+                    return self.ai_analysis_enabled
+                elif arg in ['models', 'list']:
+                    models = self.ollama.get_available_models()
+                    if models:
+                        print(f"Available Ollama models: {', '.join(models)}")
+                        print(f"Current model: {self.ollama.model}")
+                    else:
+                        print("No models available. Make sure Ollama is running.")
+                    return True
+                elif arg.startswith('model='):
+                    model_name = arg.split('=', 1)[1]
+                    if self.ollama.set_model(model_name):
+                        print(f"Switched to model: {model_name}")
+                        return True
+                    else:
+                        print(f"Failed to switch to model: {model_name}")
+                        return False
+                elif arg.startswith('animation='):
+                    anim_type = arg.split('=', 1)[1]
+                    return self.set_loading_animation(anim_type)
+                elif arg == '--help':
+                    print("AI Error Analysis Command")
+                    print("Usage: ai [on|off|toggle|status|models|model=<name>|animation=<type>]")
+                    print("  on|off|toggle : Enable/disable/toggle AI analysis")
+                    print("  status        : Show current AI analysis status")
+                    print("  models        : List available Ollama models")
+                    print("  model=<name>  : Switch to specific model")
+                    print("  animation=<type> : Set loading animation (run|dots|progress|matrix|brain)")
+                    print("  --help        : Show this help")
+                    return True
+                else:
+                    print("Usage: ai [on|off|toggle|status|models|model=<name>|animation=<type>|--help]")
+                    return False
+            else:
+                return self.toggle_ai_analysis()
 
         # Handle insights command
         if command == 'insights':
@@ -271,6 +413,39 @@ class FancyGit:
                     elif message.severity == 'warning':
                         print("\n⚠️  Warnings detected:")
                     print(message)
+            
+            # AI Analysis if enabled
+            if self.ai_analysis_enabled:
+                print("\n🤖 Analyzing with AI...")
+                try:
+                    # Convert GitError objects to dictionaries for analysis
+                    error_data = []
+                    for msg in messages:
+                        if msg.severity != 'unknown':
+                            error_dict = {
+                                'severity': msg.severity,
+                                'type': msg.type,
+                                'message': msg.message,
+                                'file': msg.file,
+                                'line': msg.line
+                            }
+                            error_data.append(error_dict)
+                    
+                    if error_data:
+                        # Start loading animation during AI analysis
+                        with LoadingContext(animation_type=self.loading_animation_type):
+                            ai_analysis = self.ollama.analyze_error_messages(error_data)
+                        
+                        if ai_analysis:
+                            print("\n🧠 AI Analysis & Suggestions:")
+                            print("-" * 40)
+                            print(ai_analysis)
+                            print("-" * 40)
+                        else:
+                            print("⚠️  AI analysis failed")
+                except Exception as e:
+                    print(f"⚠️  AI analysis error: {e}")
+            
             return False
 
 

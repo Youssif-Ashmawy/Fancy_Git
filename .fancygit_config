@@ -1,1 +1,3 @@
 confirmation_enabled=True
+ai_analysis_enabled=True
+loading_animation=run
