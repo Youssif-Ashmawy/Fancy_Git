@@ -13,16 +13,20 @@ def temp_git_repo():
     try:
         os.chdir(temp_dir)
         
-        # Initialize git repo
-        os.system("git init")
-        os.system("git config user.name 'Test User'")
-        os.system("git config user.email 'test@example.com'")
+        # Initialize git repo with explicit commands for better Windows compatibility
+        import subprocess
+        subprocess.run(["git", "init"], check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], check=True, capture_output=True)
         
         # Create initial commit
         with open("README.md", "w") as f:
             f.write("# Test Repository\n")
-        os.system("git add README.md")
-        os.system("git commit -m 'Initial commit'")
+        subprocess.run(["git", "add", "README.md"], check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], check=True, capture_output=True)
+        
+        # Ensure working directory is clean
+        subprocess.run(["git", "status"], check=True, capture_output=True)
         
         yield temp_dir
         

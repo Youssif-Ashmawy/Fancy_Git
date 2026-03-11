@@ -46,17 +46,20 @@ class TestConflictParserIntegration:
         """Test repository state functionality"""
         repo_state = self.fancy_git.get_repo_state()
         
-        # Debug: Print actual repo state on failure
-        print(f"DEBUG repo_state: {repo_state}")
-        
         # Should return a dictionary with expected keys
         assert isinstance(repo_state, dict)
         expected_keys = ['branch', 'clean', 'staged', 'modified', 'untracked', 'conflicts', 'ahead', 'behind']
         for key in expected_keys:
             assert key in repo_state
         
-        # In a clean temp repo, should be clean with no conflicts
-        # Allow for some flexibility in what "clean" means on different platforms
-        assert isinstance(repo_state['clean'], bool)
+        # In a clean temp repo, should have no conflicts
         assert isinstance(repo_state['conflicts'], list)
         assert len(repo_state['conflicts']) == 0
+        
+        # The repo should be relatively clean (may have untracked files on some platforms)
+        # Allow for platform differences in what "clean" means
+        assert isinstance(repo_state['clean'], bool)
+        # If not clean, it should be due to untracked files, not real changes
+        if not repo_state['clean']:
+            assert len(repo_state['staged']) == 0
+            assert len(repo_state['modified']) == 0
