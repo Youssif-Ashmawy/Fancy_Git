@@ -1,4 +1,8 @@
 __pycache__/
+.pytest_cache/
+.coverage
 *.pyc
 *.pyo
 .fancygit/
+.venv/
+src/__pycache__/
