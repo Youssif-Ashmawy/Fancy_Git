@@ -172,6 +172,41 @@ class FancyGit:
             print(f"Invalid animation type. Valid options: {', '.join(valid_types)}")
             return False
     
+
+    def _get_remote_branches(self):
+        # first get remote branches 
+        result = subprocess.run(["git", "branch", "-r"], capture_output=True, text=True)
+
+        branches = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+
+            if "->" in line:    # to ignore first line 
+                continue
+
+            branch = line.replace("origin/", "")    # to remove the origin thing
+            branches.append(branch)
+
+        return branches
+
+    def _get_local_branches(self):
+        result = subprocess.run(["git", "branch"], capture_output=True, text = True)
+        
+        branches = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+
+            branch = line.replace("*", "")  # to replace the marker for "current branch"
+            branches.append(branch)
+
+        return branches
+
+    def _get_new_branches(self):
+        remote_branches = self._get_remote_branches()
+        local_branches = self._get_local_branches()
+
+        return [new_branch for new_branch in remote_branches if new_branch not in local_branches]
+
     def execute_command(self, command, *args):
         """Unified dynamic command executor"""
         if command not in self.available_commands:
@@ -183,6 +218,50 @@ class FancyGit:
         if command == 'welcome':
             show_welcome()
             return True
+        
+        # Handle sync command which will 
+        # - check for new remote branches
+        # - get latest commits from remote
+        # - remove deleted remote branches and the local ones that refer to them
+        # - update current branch
+        # - create local branches for the new remote branches
+        # in just a single command "sync"
+        if command == "sync":
+            
+            # by default fetch all first
+            print("Fetching all branches and deleting remote ones....")
+            code, stdout, stderr = self.runner.run_git_command(['fetch', '--all', '--prune'])
+            print(code)
+            print("Done completely!!")
+
+            if args == '--all-branches':
+                new_branches = self._get_new_branches() # fetch new branches
+                
+                if new_branches:
+                    print("\nNew remote branches detected:")
+                    
+                    for branch in new_branches:
+                        print("  origin/", branch)
+
+                    user_input = input("Create local branches to track these branches? (Y/n)").lower()
+
+                    if user_input == 'y':
+                        print("Creating local branches....")
+                        for branch in new_branches:
+                            self.runner.run_git_command(['checkout', '-b', branch, f"origin/{branch}"])     # ignore output for now cause well i cant find a use for it
+                        
+                        print("Done Creating local branches!!")
+                        return
+            elif args == '--ai-summary':    # will implement a feature later that will changes smth like this
+                # Warning: Your local branch is 12 commits behind origin/main.
+                # Large pull detected.
+                # Would you like a summary of incoming changes? (AI)
+                # Incoming changes summary:
+                # • New authentication middleware
+                # • Refactor of merge parser
+                # • Bug fix in CLI command loader
+                None
+            return
         
         # Handle confirmation command specially
         if command == 'confirmation':

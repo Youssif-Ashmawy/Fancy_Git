@@ -43,6 +43,7 @@ stash
 status
 submodule
 switch
+sync
 tag
 welcome
 worktree
