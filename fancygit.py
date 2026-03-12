@@ -219,6 +219,30 @@ class FancyGit:
             show_welcome()
             return True
         
+        if command.startswith('explain'):
+            if not args:
+                print("Usage: fancygit explain <command>")
+                return True
+            
+            explain_command = args[0]
+            previous_model = self.ollama.model  # saves old model
+
+            # first switch model to codellama for better explanation
+            if self.ollama.set_model('codellama'):
+                print(f"Switched to model: codellama for explanation DISABLE THIS THIS IS A DEV COMMENT ONLY")
+            else:
+                print(f"Failed to switch to model: codellama. Explanation may be less accurate.")
+
+            prompt = self.ollama._build_explain_prompt(explain_command)
+            
+            print("\n Explanation for command: git", explain_command)
+            print("-" * 40)
+            print(self.ollama._call_ollama(prompt))
+
+            self.ollama.set_model(previous_model)
+            print('switched back to default model')     # COMMENT THESE
+            return True
+
         # Handle sync command which will 
         # - check for new remote branches
         # - get latest commits from remote
@@ -260,6 +284,8 @@ class FancyGit:
                 # • New authentication middleware
                 # • Refactor of merge parser
                 # • Bug fix in CLI command loader
+
+
                 None
             return
         

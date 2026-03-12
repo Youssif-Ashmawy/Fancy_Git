@@ -15,6 +15,7 @@ commit
 confirmation
 describe
 diff
+explain
 fetch
 format-patch
 gc

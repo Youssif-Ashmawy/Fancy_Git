@@ -119,6 +119,51 @@ class OllamaClient:
         except Exception as e:
             raise Exception(f"Error calling Ollama: {str(e)}")
     
+    def _build_explain_prompt(self, command: str) -> str:
+        """
+        Generates a prompt for FancyGit commands that produces:
+        1. Friendly conceptual explanation
+        2. Real-life example of usage
+        3. Step-by-step actionable guide
+        """
+        prompt = f"""
+        You are an expert Git tutor who explains FancyGit commands clearly, naturally, and thoroughly.
+
+        Your task is to explain the FancyGit command "{command}" in **three layers**:
+
+        1. **Conceptual Explanation**:
+        - Explain in a friendly, beginner-focused way.
+        - Include the 'why' and 'how' behind the command.
+        - Make it conversational and easy to understand.
+        - Do NOT include numbered steps here.
+
+        2. **Real-life Example**:
+        - Give a concrete scenario where a developer would run this command.
+        - Explain why they would run it in that scenario.
+        - Describe the effect on the local and remote repositories, or workflow.
+
+        3. **Step-by-Step Actionable Guide**:
+        - Provide clear numbered steps for how to execute the command.
+        - Include optional flags or considerations if relevant.
+        - Keep it simple, but actionable for someone following along.
+
+        Format the output in this order, clearly labeled:
+
+        ----------------------------------------
+        Command: {command}
+        ----------------------------------------
+        [Conceptual Explanation]
+
+        [Real-life Example]
+
+        [Step-by-Step Guide]
+
+        ----------------------------------------
+
+        Generate a complete explanation following this structure.
+        """
+        return prompt
+
     def set_model(self, model: str) -> bool:
         """Change the model being used"""
         available_models = self.get_available_models()
