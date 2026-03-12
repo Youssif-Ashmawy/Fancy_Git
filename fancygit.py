@@ -26,8 +26,8 @@ class FancyGit:
         self.runner = GitRunner()
         self.parser = GitErrorParser()
         self.available_commands = self._load_commands()
-        self.confirmation_enabled = self._load_confirmation_state()
-        self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
+        self.confirmation_enabled = self._load_confirmation_state()     
+        self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')    # config file
     
     def _load_commands(self):
         """Dynamically load commands from command-list.txt file"""
@@ -42,9 +42,8 @@ class FancyGit:
     
     def _load_confirmation_state(self):
         """Load confirmation state from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
         try:
-            with open(config_file, 'r') as f:
+            with open(self.config_file, 'r') as f:
                 for line in f:
                     if line.startswith('confirmation_enabled='):
                         return line.strip().split('=')[1].lower() == 'true'
