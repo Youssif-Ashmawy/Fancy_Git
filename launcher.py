@@ -82,6 +82,11 @@ def main():
     # Show welcome message if installation was successful
     if success:
         # print("\n🎉 FancyGit installation completed successfully!")
+        # clear the console
+        if os_type in ["linux", "macos"]:
+            subprocess.run('clear', shell=True)
+        elif os_type == "windows":
+            subprocess.run('cls', shell=True)
         show_welcome()
 
 

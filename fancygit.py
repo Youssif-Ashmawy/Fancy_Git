@@ -258,7 +258,7 @@ class FancyGit:
             print(code)
             print("Done completely!!")
 
-            if args == '--all-branches':
+            if '--all-branches' in args:
                 new_branches = self._get_new_branches() # fetch new branches
                 
                 if new_branches:
@@ -276,7 +276,7 @@ class FancyGit:
                         
                         print("Done Creating local branches!!")
                         return
-            elif args == '--ai-summary':    # will implement a feature later that will changes smth like this
+            elif '--ai-summary' in args:    # will implement a feature later that will changes smth like this
                 # Warning: Your local branch is 12 commits behind origin/main.
                 # Large pull detected.
                 # Would you like a summary of incoming changes? (AI)
