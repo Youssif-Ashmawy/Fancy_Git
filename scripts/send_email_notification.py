@@ -14,22 +14,45 @@ from datetime import datetime
 
 def get_commit_author_email():
     """Get the email of the person who made the commit."""
-    # Try to get from environment variables first (GitHub Actions)
-    if 'GITHUB_ACTOR' in os.environ:
-        # For GitHub, we need to get the user's email from the API or use a default
-        # This is a limitation - GitHub doesn't expose user emails directly
-        return f"{os.environ['GITHUB_ACTOR']}@users.noreply.github.com"
-    
-    # Fallback to git command
+    # Try git command first to get actual commit author email
     try:
         import subprocess
         result = subprocess.run(['git', 'log', '-1', '--pretty=format:%ae'], 
                               capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except Exception:
-        pass
+            email = result.stdout.strip()
+            print(f"DEBUG: Git commit author email: {email}")
+            # Don't use noreply emails if we can avoid it
+            if not email.endswith('@users.noreply.github.com'):
+                return email
+            else:
+                print(f"DEBUG: Git email is noreply, trying alternatives...")
+    except Exception as e:
+        print(f"DEBUG: Git command failed: {e}")
     
+    # Try to get from git config as fallback
+    try:
+        result = subprocess.run(['git', 'config', 'user.email'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            email = result.stdout.strip()
+            print(f"DEBUG: Git config email: {email}")
+            if not email.endswith('@users.noreply.github.com'):
+                return email
+    except Exception as e:
+        print(f"DEBUG: Git config failed: {e}")
+    
+    # Fallback to environment variables (GitHub Actions)
+    if 'GITHUB_ACTOR' in os.environ:
+        actor = os.environ['GITHUB_ACTOR']
+        print(f"DEBUG: GitHub actor: {actor}")
+        # For GitHub, we need to get the user's email from the API or use a default
+        # This is a limitation - GitHub doesn't expose user emails directly
+        noreply_email = f"{actor}@users.noreply.github.com"
+        print(f"DEBUG: Using GitHub noreply email: {noreply_email}")
+        return noreply_email
+    
+    print("DEBUG: Using fallback email")
     return "unknown@example.com"
 
 
