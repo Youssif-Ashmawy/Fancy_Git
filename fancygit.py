@@ -11,6 +11,7 @@ from src.mermaid_export import MermaidExporter
 from src.git_insights import GitInsights
 from src.ollama_client import OllamaClient
 from src.loading_animation import LoadingContext
+from src.config_manager import ConfigManager
 from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -29,16 +30,13 @@ CONFIG_FILE = BASE_DIR / ".fancygit_config"
 class FancyGit:
     def __init__(self):
         # initialize required components
+        self.config_manager = ConfigManager()
         self.runner = GitRunner()
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
         self.insights = GitInsights(self.runner)
         self.ollama = OllamaClient()
         self.available_commands = self._load_commands()
-        self.confirmation_enabled = self._load_confirmation_state()
-        self.ai_analysis_enabled = self._load_ai_analysis_state()
-        self.loading_animation_type = self._load_animation_type()
-        self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
     
     def _load_commands(self):
         """Dynamically load commands from command-list.txt file"""
@@ -51,55 +49,6 @@ class FancyGit:
             print(f"Warning: {commands_file} not found. No commands available.")
             return []
     
-    def _load_confirmation_state(self):
-        """Load confirmation state from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('confirmation_enabled='):
-                        return line.strip().split('=')[1].lower() == 'true'
-        except FileNotFoundError:
-            pass
-        return True  # Default to enabled
-    
-    def _load_ai_analysis_state(self):
-        """Load AI analysis state from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('ai_analysis_enabled='):
-                        return line.strip().split('=')[1].lower() == 'true'
-        except FileNotFoundError:
-            pass
-        return True  # Default to enabled
-    
-    def _load_animation_type(self):
-        """Load loading animation type from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('loading_animation='):
-                        anim_type = line.strip().split('=')[1].strip()
-                        valid_types = ['run', 'dots', 'progress', 'matrix', 'brain']
-                        if anim_type in valid_types:
-                            return anim_type
-        except FileNotFoundError:
-            pass
-        return 'dots'  # Default to dots animation
-    
-    def _save_confirmation_state(self):
-        """Save confirmation state to config file"""
-        try:
-            with open(self.config_file, 'w') as f:
-                f.write(f'confirmation_enabled={self.confirmation_enabled}\n')
-                f.write(f'ai_analysis_enabled={self.ai_analysis_enabled}\n')
-                f.write(f'loading_animation={self.loading_animation_type}\n')
-        except Exception as e:
-            print(f"Warning: Could not save confirmation state: {e}")
-    
     def toggle_confirmation(self, enable=None):
         """Toggle confirmation messages before executing commands
         
@@ -111,16 +60,16 @@ class FancyGit:
             bool: Current confirmation state
         """
         if enable is None:
-            self.confirmation_enabled = not self.confirmation_enabled
+            self.config_manager.config.confirmation_enabled = not self.config_manager.config.confirmation_enabled
         else:
-            self.confirmation_enabled = enable
+            self.config_manager.config.confirmation_enabled = enable
         
         # Save the state to file
-        self._save_confirmation_state()
+        self.config_manager.save_config()
         
-        status = "enabled" if self.confirmation_enabled else "disabled"
+        status = "enabled" if self.config_manager.config.confirmation_enabled else "disabled"
         print(f"Confirmation messages {status}")
-        return self.confirmation_enabled
+        return self.config_manager.config.confirmation_enabled
     
     def toggle_ai_analysis(self, enable=None):
         """Toggle AI analysis of error messages
@@ -133,25 +82,25 @@ class FancyGit:
             bool: Current AI analysis state
         """
         if enable is None:
-            self.ai_analysis_enabled = not self.ai_analysis_enabled
+            self.config_manager.config.ai_analysis_enabled = not self.config_manager.config.ai_analysis_enabled
         else:
-            self.ai_analysis_enabled = enable
+            self.config_manager.config.ai_analysis_enabled = enable
         
         # Save the state to file
-        self._save_confirmation_state()
+        self.config_manager.save_config()
         
-        status = "enabled" if self.ai_analysis_enabled else "disabled"
+        status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
         print(f"AI error analysis {status}")
         
         # Check Ollama connection when enabling
-        if self.ai_analysis_enabled and not self.ollama.test_connection():
+        if self.config_manager.config.ai_analysis_enabled and not self.ollama.test_connection():
             print("⚠️  Warning: Cannot connect to Ollama. Make sure Ollama is running on localhost:11434")
             print("   Install Ollama from https://ollama.ai/ and run 'ollama serve'")
-            self.ai_analysis_enabled = False
-            self._save_confirmation_state()
+            self.config_manager.config.ai_analysis_enabled = False
+            self.config_manager.save_config()
             return False
         
-        return self.ai_analysis_enabled
+        return self.config_manager.config.ai_analysis_enabled
     
     def set_loading_animation(self, animation_type):
         """Set the loading animation type
@@ -164,8 +113,8 @@ class FancyGit:
         """
         valid_types = ['run', 'dots', 'progress', 'matrix', 'brain']
         if animation_type in valid_types:
-            self.loading_animation_type = animation_type
-            self._save_confirmation_state()
+            self.config_manager.config.loading_animation = animation_type
+            self.config_manager.save_config()
             print(f"Loading animation set to: {animation_type}")
             return True
         else:
@@ -173,12 +122,12 @@ class FancyGit:
             return False
     
 
-    def _get_remote_branches(self):
+    def _get_remote_branches(self): 
         # first get remote branches 
-        result = subprocess.run(["git", "branch", "-r"], capture_output=True, text=True)
+        code, stdout, stderr = self.runner.run_git_command(['branch', '-r'])
 
         branches = []
-        for line in result.stdout.splitlines():
+        for line in stdout.splitlines():
             line = line.strip()
 
             if "->" in line:    # to ignore first line 
@@ -190,10 +139,10 @@ class FancyGit:
         return branches
 
     def _get_local_branches(self):
-        result = subprocess.run(["git", "branch"], capture_output=True, text = True)
+        code, stdout, stderr = self.runner.run_git_command(['branch'])
         
         branches = []
-        for line in result.stdout.splitlines():
+        for line in stdout.splitlines():
             line = line.strip()
 
             branch = line.replace("*", "")  # to replace the marker for "current branch"
@@ -300,9 +249,9 @@ class FancyGit:
                 elif arg in ['toggle', 'switch']:
                     return self.toggle_confirmation()
                 elif arg in ['status', 'check']:
-                    status = "enabled" if self.confirmation_enabled else "disabled"
+                    status = "enabled" if self.config_manager.config.confirmation_enabled else "disabled"
                     print(f"Confirmation messages are {status}")
-                    return self.confirmation_enabled
+                    return self.config_manager.config.confirmation_enabled
                 else:
                     print("Usage: confirmation [on|off|toggle|status]")
                     return False
@@ -320,9 +269,9 @@ class FancyGit:
                 elif arg in ['toggle', 'switch']:
                     return self.toggle_ai_analysis()
                 elif arg in ['status', 'check']:
-                    status = "enabled" if self.ai_analysis_enabled else "disabled"
+                    status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
                     print(f"AI error analysis is {status}")
-                    if self.ai_analysis_enabled:
+                    if self.config_manager.config.ai_analysis_enabled:
                         if self.ollama.test_connection():
                             models = self.ollama.get_available_models()
                             print(f"Using model: {self.ollama.model}")
@@ -330,8 +279,8 @@ class FancyGit:
                                 print(f"Available models: {', '.join(models[:5])}")
                         else:
                             print("⚠️  Ollama is not connected")
-                    print(f"Loading animation: {self.loading_animation_type}")
-                    return self.ai_analysis_enabled
+                    print(f"Loading animation: {self.config_manager.config.loading_animation}")
+                    return self.config_manager.config.ai_analysis_enabled
                 elif arg in ['models', 'list']:
                     models = self.ollama.get_available_models()
                     if models:
@@ -491,7 +440,7 @@ class FancyGit:
         print(f"Running: git {command} {' '.join(args)}")
 
         # Show confirmation before executing the command
-        if self.confirmation_enabled:
+        if self.config_manager.config.confirmation_enabled:
             response = input(f"Execute 'git {command} {' '.join(args)}'? [y/N]: ").strip().lower()
             if response != 'y':
                 print("Command cancelled.")
@@ -520,7 +469,7 @@ class FancyGit:
                     print(message)
             
             # AI Analysis if enabled
-            if self.ai_analysis_enabled:
+            if self.config_manager.config.ai_analysis_enabled:
                 print("\n🤖 Analyzing with AI...")
                 try:
                     # Convert GitError objects to dictionaries for analysis
@@ -538,7 +487,7 @@ class FancyGit:
                     
                     if error_data:
                         # Start loading animation during AI analysis
-                        with LoadingContext(animation_type=self.loading_animation_type):
+                        with LoadingContext(animation_type=self.config_manager.config.loading_animation):
                             ai_analysis = self.ollama.analyze_error_messages(error_data)
                         
                         if ai_analysis:
