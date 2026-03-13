@@ -11,6 +11,7 @@ cherry-pick
 citool
 clean
 clone
+colors
 commit
 confirmation
 describe

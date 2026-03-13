@@ -3,10 +3,11 @@
 FancyGit Welcome Message Script
 Displays the cool ASCII art welcome message
 """
+from src.colors import Colors, color_header, color_info
 
 def show_welcome():
     """Display the FancyGit welcome message with colors"""
-    print("\033[93m" + r"""
+    print(Colors.colorize(r"""
      /$$$$$$$$ /$$$$$$  /$$   /$$  /$$$$$$  /$$     /$$ /$$$$$$  /$$$$$$ /$$$$$$$$
     | $$_____//$$__  $$| $$$ | $$ /$$__  $$|  $$   /$$//$$__  $$|_  $$_/|__  $$__/
     | $$     | $$  \ $$| $$$$| $$| $$  \__/ \  $$ /$$/| $$  \__/  | $$     | $$   
@@ -15,9 +16,9 @@ def show_welcome():
     | $$     | $$  | $$| $$\  $$$| $$    $$    | $$   | $$  \ $$  | $$     | $$   
     | $$     | $$  | $$| $$ \  $$|  $$$$$$/    | $$   |  $$$$$$/ /$$$$$$   | $$   
     |__/     |__/  |__/|__/  \__/ \______/     |__/    \______/ |______/   |__/
-    """ + "\033[0m")
+    """, Colors.BRIGHT_YELLOW))
     
-    print(f"\033[96m{'*'*22} \033[93m🚀 FancyGit - Enhanced Git Experience\033[96m {'*'*22}\033[0m")
+    print(color_info(f"{'*'*22} ") + color_header("🚀 FancyGit - Enhanced Git Experience") + color_info(f" {'*'*22}"))
     print()
 
 if __name__ == "__main__":

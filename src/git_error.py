@@ -19,6 +19,7 @@
 #   "line": null
 # }
 from dataclasses import dataclass
+from src.colors import Colors, color_error, color_warning, color_info, color_file
 
 @dataclass(frozen = True)   # we freeze it to make it immutable
 class GitError:
@@ -31,13 +32,20 @@ class GitError:
     line: int | None = None
 
     def __str__(self) -> str:
+        severity_color = {
+            'error': color_error,
+            'warning': color_warning,
+            'info': color_info,
+            'unknown': lambda x: x
+        }.get(self.severity, lambda x: x)
+        
         return (
-            f"{'='*60}\n"
-            f"type: {self.type}\n"
-            f"source: {self.source}\n"
-            f"message: {self.message}\n"
-            f"severity: {self.severity}\n"
-            f"file: {self.file}\n"
-            f"line: {self.line}\n"
-            f"{'='*60}"
+            f"{Colors.divider('=', 60)}\n"
+            f"type: {color_info(str(self.type))}\n"
+            f"source: {color_info(str(self.source))}\n"
+            f"message: {severity_color(str(self.message))}\n"
+            f"severity: {severity_color(str(self.severity))}\n"
+            f"file: {color_file(str(self.file)) if self.file else 'N/A'}\n"
+            f"line: {color_info(str(self.line)) if self.line else 'N/A'}\n"
+            f"{Colors.divider('=', 60)}"
         )

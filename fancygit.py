@@ -11,6 +11,8 @@ from src.mermaid_export import MermaidExporter
 from src.git_insights import GitInsights
 from src.ollama_client import OllamaClient
 from src.loading_animation import LoadingContext
+from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
+from src.output_colorizer import OutputColorizer
 from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -28,15 +30,20 @@ CONFIG_FILE = BASE_DIR / ".fancygit_config"
 
 class FancyGit:
     def __init__(self):
+        # Check color support first
+        Colors.check_color_support()
+        
         # initialize required components
         self.runner = GitRunner()
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
         self.insights = GitInsights(self.runner)
         self.ollama = OllamaClient()
+        self.output_colorizer = OutputColorizer()
         self.available_commands = self._load_commands()
         self.confirmation_enabled = self._load_confirmation_state()
         self.ai_analysis_enabled = self._load_ai_analysis_state()
+        self.output_coloring_enabled = self._load_output_coloring_state()
         self.loading_animation_type = self._load_animation_type()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
     
@@ -48,7 +55,7 @@ class FancyGit:
             with open(commands_file, 'r') as f:
                 return [line.strip() for line in f if line.strip()]
         except FileNotFoundError:
-            print(f"Warning: {commands_file} not found. No commands available.")
+            print(color_warning(f"Warning: {commands_file} not found. No commands available."))
             return []
     
     def _load_confirmation_state(self):
@@ -90,15 +97,28 @@ class FancyGit:
             pass
         return 'dots'  # Default to dots animation
     
+    def _load_output_coloring_state(self):
+        """Load output coloring state from config file"""
+        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
+        try:
+            with open(config_file, 'r') as f:
+                for line in f:
+                    if line.startswith('output_coloring_enabled='):
+                        return line.strip().split('=')[1].lower() == 'true'
+        except FileNotFoundError:
+            pass
+        return True  # Default to enabled
+    
     def _save_confirmation_state(self):
         """Save confirmation state to config file"""
         try:
             with open(self.config_file, 'w') as f:
                 f.write(f'confirmation_enabled={self.confirmation_enabled}\n')
                 f.write(f'ai_analysis_enabled={self.ai_analysis_enabled}\n')
+                f.write(f'output_coloring_enabled={self.output_coloring_enabled}\n')
                 f.write(f'loading_animation={self.loading_animation_type}\n')
         except Exception as e:
-            print(f"Warning: Could not save confirmation state: {e}")
+            print(color_warning(f"Warning: Could not save confirmation state: {e}"))
     
     def toggle_confirmation(self, enable=None):
         """Toggle confirmation messages before executing commands
@@ -119,7 +139,7 @@ class FancyGit:
         self._save_confirmation_state()
         
         status = "enabled" if self.confirmation_enabled else "disabled"
-        print(f"Confirmation messages {status}")
+        print(color_info(f"Confirmation messages {status}"))
         return self.confirmation_enabled
     
     def toggle_ai_analysis(self, enable=None):
@@ -141,17 +161,39 @@ class FancyGit:
         self._save_confirmation_state()
         
         status = "enabled" if self.ai_analysis_enabled else "disabled"
-        print(f"AI error analysis {status}")
+        print(color_info(f"AI error analysis {status}"))
         
         # Check Ollama connection when enabling
         if self.ai_analysis_enabled and not self.ollama.test_connection():
-            print("⚠️  Warning: Cannot connect to Ollama. Make sure Ollama is running on localhost:11434")
-            print("   Install Ollama from https://ollama.ai/ and run 'ollama serve'")
+            print(color_warning("⚠️  Warning: Cannot connect to Ollama. Make sure Ollama is running on localhost:11434"))
+            print(color_warning("   Install Ollama from https://ollama.ai/ and run 'ollama serve'"))
             self.ai_analysis_enabled = False
             self._save_confirmation_state()
             return False
         
         return self.ai_analysis_enabled
+    
+    def toggle_output_coloring(self, enable=None):
+        """Toggle intelligent output coloring
+        
+        Args:
+            enable (bool, optional): If True, enable output coloring. If False, disable output coloring.
+                                    If None, toggle current state.
+        
+        Returns:
+            bool: Current output coloring state
+        """
+        if enable is None:
+            self.output_coloring_enabled = not self.output_coloring_enabled
+        else:
+            self.output_coloring_enabled = enable
+        
+        # Save the state to file
+        self._save_confirmation_state()
+        
+        status = "enabled" if self.output_coloring_enabled else "disabled"
+        print(color_info(f"Output coloring {status}"))
+        return self.output_coloring_enabled
     
     def set_loading_animation(self, animation_type):
         """Set the loading animation type
@@ -166,17 +208,17 @@ class FancyGit:
         if animation_type in valid_types:
             self.loading_animation_type = animation_type
             self._save_confirmation_state()
-            print(f"Loading animation set to: {animation_type}")
+            print(color_info(f"Loading animation set to: {animation_type}"))
             return True
         else:
-            print(f"Invalid animation type. Valid options: {', '.join(valid_types)}")
+            print(color_error(f"Invalid animation type. Valid options: {', '.join(valid_types)}"))
             return False
     
     def execute_command(self, command, *args):
         """Unified dynamic command executor"""
         if command not in self.available_commands:
-            print(f"Unknown command: {command}")
-            print(f"Available commands: {', '.join(self.available_commands)}")
+            print(color_error(f"Unknown command: {command}"))
+            print(color_info(f"Available commands: {', '.join(self.available_commands)}"))
             return False
         
         # Handle welcome command
@@ -196,10 +238,10 @@ class FancyGit:
                     return self.toggle_confirmation()
                 elif arg in ['status', 'check']:
                     status = "enabled" if self.confirmation_enabled else "disabled"
-                    print(f"Confirmation messages are {status}")
+                    print(color_info(f"Confirmation messages are {status}"))
                     return self.confirmation_enabled
                 else:
-                    print("Usage: confirmation [on|off|toggle|status]")
+                    print(color_warning("Usage: confirmation [on|off|toggle|status]"))
                     return False
             else:
                 return self.toggle_confirmation()
@@ -216,39 +258,39 @@ class FancyGit:
                     return self.toggle_ai_analysis()
                 elif arg in ['status', 'check']:
                     status = "enabled" if self.ai_analysis_enabled else "disabled"
-                    print(f"AI error analysis is {status}")
+                    print(color_info(f"AI error analysis is {status}"))
                     if self.ai_analysis_enabled:
                         if self.ollama.test_connection():
                             models = self.ollama.get_available_models()
-                            print(f"Using model: {self.ollama.model}")
+                            print(color_success(f"Using model: {self.ollama.model}"))
                             if models:
-                                print(f"Available models: {', '.join(models[:5])}")
+                                print(color_info(f"Available models: {', '.join(models[:5])}"))
                         else:
-                            print("⚠️  Ollama is not connected")
-                    print(f"Loading animation: {self.loading_animation_type}")
+                            print(color_warning("⚠️  Ollama is not connected"))
+                    print(color_info(f"Loading animation: {self.loading_animation_type}"))
                     return self.ai_analysis_enabled
                 elif arg in ['models', 'list']:
                     models = self.ollama.get_available_models()
                     if models:
-                        print(f"Available Ollama models: {', '.join(models)}")
-                        print(f"Current model: {self.ollama.model}")
+                        print(color_info(f"Available Ollama models: {', '.join(models)}"))
+                        print(color_success(f"Current model: {self.ollama.model}"))
                     else:
-                        print("No models available. Make sure Ollama is running.")
+                        print(color_warning("No models available. Make sure Ollama is running."))
                     return True
                 elif arg.startswith('model='):
                     model_name = arg.split('=', 1)[1]
                     if self.ollama.set_model(model_name):
-                        print(f"Switched to model: {model_name}")
+                        print(color_success(f"Switched to model: {model_name}"))
                         return True
                     else:
-                        print(f"Failed to switch to model: {model_name}")
+                        print(color_error(f"Failed to switch to model: {model_name}"))
                         return False
                 elif arg.startswith('animation='):
                     anim_type = arg.split('=', 1)[1]
                     return self.set_loading_animation(anim_type)
                 elif arg == '--help':
-                    print("AI Error Analysis Command")
-                    print("Usage: ai [on|off|toggle|status|models|model=<name>|animation=<type>]")
+                    print(color_header("AI Error Analysis Command"))
+                    print(color_info("Usage: ai [on|off|toggle|status|models|model=<name>|animation=<type>]"))
                     print("  on|off|toggle : Enable/disable/toggle AI analysis")
                     print("  status        : Show current AI analysis status")
                     print("  models        : List available Ollama models")
@@ -257,10 +299,37 @@ class FancyGit:
                     print("  --help        : Show this help")
                     return True
                 else:
-                    print("Usage: ai [on|off|toggle|status|models|model=<name>|animation=<type>|--help]")
+                    print(color_warning("Usage: ai [on|off|toggle|status|models|model=<name>|animation=<type>|--help]"))
                     return False
             else:
                 return self.toggle_ai_analysis()
+
+        # Handle output coloring command
+        if command == 'colors':
+            if args:
+                arg = args[0].lower()
+                if arg in ['on', 'enable', 'true', '1']:
+                    return self.toggle_output_coloring(True)
+                elif arg in ['off', 'disable', 'false', '0']:
+                    return self.toggle_output_coloring(False)
+                elif arg in ['toggle', 'switch']:
+                    return self.toggle_output_coloring()
+                elif arg in ['status', 'check']:
+                    status = "enabled" if self.output_coloring_enabled else "disabled"
+                    print(color_info(f"Output coloring is {status}"))
+                    return self.output_coloring_enabled
+                elif arg == '--help':
+                    print(color_header("Output Coloring Command"))
+                    print(color_info("Usage: colors [on|off|toggle|status]"))
+                    print("  on|off|toggle : Enable/disable/toggle output coloring")
+                    print("  status        : Show current output coloring status")
+                    print("  --help        : Show this help")
+                    return True
+                else:
+                    print(color_warning("Usage: colors [on|off|toggle|status]"))
+                    return False
+            else:
+                return self.toggle_output_coloring()
 
         # Handle insights command
         if command == 'insights':
@@ -276,18 +345,18 @@ class FancyGit:
                     try:
                         days = int(arg.split('=', 1)[1])
                     except ValueError:
-                        print("Invalid --days value")
+                        print(color_error("Invalid --days value"))
                         return False
                 elif arg.startswith('--format='):
                     output_format = arg.split('=', 1)[1].lower()
                     if output_format not in ['console', 'json']:
-                        print("Invalid format. Use 'console' or 'json'")
+                        print(color_error("Invalid format. Use 'console' or 'json'"))
                         return False
                 elif arg.startswith('--output='):
                     output_file = arg.split('=', 1)[1]
                 elif arg == '--help':
-                    print("Git Insights Command")
-                    print("Usage: insights [--days=N] [--format=console|json] [--output=filename]")
+                    print(color_header("Git Insights Command"))
+                    print(color_info("Usage: insights [--days=N] [--format=console|json] [--output=filename]"))
                     print("  --days=N        : Analysis period in days (default: 30)")
                     print("  --format=...   : Output format (default: console)")
                     print("  --output=...   : Save to file (optional)")
@@ -307,13 +376,13 @@ class FancyGit:
                 if output_file:
                     with open(output_file, 'w') as f:
                         f.write(output)
-                    print(f"Insights report saved to: {output_file}")
+                    print(color_success(f"Insights report saved to: {output_file}"))
                 else:
                     print(output)
                 
                 return True
             except Exception as e:
-                print(f"Failed to generate insights: {e}")
+                print(color_error(f"Failed to generate insights: {e}"))
                 return False
         # Mermaid repo visualization
         if command == 'visualize':
@@ -329,24 +398,24 @@ class FancyGit:
                     try:
                         max_commits = int(arg.split('=', 1)[1])
                     except ValueError:
-                        print("Invalid --max-commits value")
+                        print(color_error("Invalid --max-commits value"))
                         return False
                 elif arg == '--no-open':
                     open_browser = False
                 elif arg == '--help':
-                    print("Git Repository Visualization Command")
-                    print("Usage: visualize [directory] [options]")
+                    print(color_header("Git Repository Visualization Command"))
+                    print(color_info("Usage: visualize [directory] [options]"))
                     print("")
-                    print("Arguments:")
+                    print(color_info("Arguments:"))
                     print("  directory        : Output directory (default: .fancygit)")
                     print("                   Automatically prefixed with '.' to make hidden")
                     print("")
-                    print("Options:")
+                    print(color_info("Options:"))
                     print("  --max-commits=N  : Maximum number of commits to include (default: 40)")
                     print("  --no-open        : Don't open HTML in browser automatically")
                     print("  --help           : Show this help message")
                     print("")
-                    print("Examples:")
+                    print(color_info("Examples:"))
                     print("  visualize                    # Use default settings")
                     print("  visualize my_output           # Create .my_output directory")
                     print("  visualize --max-commits=20    # Limit to 20 commits")
@@ -362,12 +431,12 @@ class FancyGit:
             try:
                 repo_state = self.get_repo_state()
                 paths = self.mermaid.export_all(output_dir=output_dir, repo_state=repo_state, max_commits=max_commits)
-                print("Mermaid export created:")
-                print(f"  Status: {paths['status_mmd']}")
-                print(f"  Graph : {paths['graph_mmd']}")
-                print(f"  Tree  : {paths['tree_mmd']}")
-                print(f"  Deps  : {paths['deps_mmd']}")
-                print(f"  HTML  : {paths['html']}")
+                print(color_success("Mermaid export created:"))
+                print(f"  Status: {color_file(paths['status_mmd'])}")
+                print(f"  Graph : {color_file(paths['graph_mmd'])}")
+                print(f"  Tree  : {color_file(paths['tree_mmd'])}")
+                print(f"  Deps  : {color_file(paths['deps_mmd'])}")
+                print(f"  HTML  : {color_file(paths['html'])}")
 
                 if open_browser:
                     # Convert to absolute path for browser
@@ -375,7 +444,7 @@ class FancyGit:
                     webbrowser.open(f"file://{html_path}")
                 return True
             except Exception as e:
-                print(f"Failed to visualize repo: {e}")
+                print(color_error(f"Failed to visualize repo: {e}"))
                 return False
         
         return self._command_handler(command, *args)
@@ -383,40 +452,52 @@ class FancyGit:
     # REFACTORED
     def _command_handler(self, command, *args):     # private function
         """A Generic git commands handler"""
-        print(f"Running: git {command} {' '.join(args)}")
+        print(color_command(f"Running: git {command} {' '.join(args)}"))
 
         # Show confirmation before executing the command
         if self.confirmation_enabled:
-            response = input(f"Execute 'git {command} {' '.join(args)}'? [y/N]: ").strip().lower()
+            response = input(color_info(f"Execute 'git {command} {' '.join(args)}'? [y/N]: ")).strip().lower()
             if response != 'y':
-                print("Command cancelled.")
+                print(color_warning("Command cancelled."))
                 return False
 
         # Execute the command
         returncode, stdout, stderr = self.runner.run_git_command([command] + list(args))
         messages = self.parser.detect_warnings_errors(stdout, stderr)
         
+        # Colorize the output if enabled
+        if self.output_coloring_enabled:
+            colored_stdout, colored_stderr = self.output_colorizer.colorize_output(command, stdout, stderr)
+        else:
+            colored_stdout, colored_stderr = stdout, stderr
+        
         if not messages:        # IF MSGS ARE EMPTY
-            print("\n✅ No warnings or errors detected")
-            if stdout:
-                print(stdout)
-            if stderr:
-                print(stderr)
+            print(color_success("\n✅ No warnings or errors detected"))
+            if colored_stdout:
+                print(colored_stdout, flush=True)
+            if colored_stderr:
+                print(colored_stderr, flush=True)
             if not stdout and not stderr:
-                print("Command executed successfully!")
+                print(color_success("Command executed successfully!"), flush=True)
             return True
         else:
+            # Print colored output even with errors/warnings
+            if colored_stdout:
+                print(colored_stdout, flush=True)
+            if colored_stderr:
+                print(colored_stderr, flush=True)
+                
             for message in messages:
                 if message.severity != 'unknown':
                     if message.severity == 'error':
-                        print("\n❌ Errors detected:")
+                        print(color_error("\n❌ Errors detected:"))
                     elif message.severity == 'warning':
-                        print("\n⚠️  Warnings detected:")
+                        print(color_warning("\n⚠️  Warnings detected:"))
                     print(message)
             
             # AI Analysis if enabled
             if self.ai_analysis_enabled:
-                print("\n🤖 Analyzing with AI...")
+                print(color_info("\n🤖 Analyzing with AI..."))
                 try:
                     # Convert GitError objects to dictionaries for analysis
                     error_data = []
@@ -437,14 +518,16 @@ class FancyGit:
                             ai_analysis = self.ollama.analyze_error_messages(error_data)
                         
                         if ai_analysis:
-                            print("\n🧠 AI Analysis & Suggestions:")
-                            print("-" * 40)
-                            print(ai_analysis)
-                            print("-" * 40)
+                            print(color_ai("\n🧠 AI Analysis & Suggestions:"))
+                            print(Colors.divider("-", 40))
+                            print(color_ai(ai_analysis))
+                            print(Colors.divider("-", 40))
                         else:
-                            print("⚠️  AI analysis failed")
+                            print(color_warning("⚠️  AI analysis failed"))
+                    else:
+                        print(color_warning("⚠️  No valid error data for AI analysis"))
                 except Exception as e:
-                    print(f"⚠️  AI analysis error: {e}")
+                    print(color_error(f"⚠️  AI analysis error: {e}"))
             
             return False
 
@@ -516,68 +599,69 @@ class FancyGit:
     def _format_insights_console(self, report):
         """Format insights report for console display"""
         output = []
-        output.append("=" * 60)
-        output.append("🔍 GIT INSIGHTS REPORT")
-        output.append("=" * 60)
-        output.append(f"Generated: {report['generated_at'][:19]}")
-        output.append(f"Analysis Period: {report['analysis_period_days']} days")
+        output.append(Colors.divider("=", 60))
+        output.append(color_header("🔍 GIT INSIGHTS REPORT"))
+        output.append(Colors.divider("=", 60))
+        output.append(color_info(f"Generated: {report['generated_at'][:19]}"))
+        output.append(color_info(f"Analysis Period: {report['analysis_period_days']} days"))
         output.append("")
         
         # Summary
         summary = report['summary']
-        output.append("📊 SUMMARY")
-        output.append("-" * 30)
-        output.append(f"Total Commits: {summary['total_commits']}")
-        output.append(f"Active Contributors: {summary['active_contributors']}")
-        output.append(f"Active Branches: {summary['active_branches']}/{summary['total_branches']}")
-        output.append(f"Files Changed: {summary['total_files_changed']}")
+        output.append(color_header("📊 SUMMARY"))
+        output.append(Colors.divider("-", 30))
+        output.append(color_info(f"Total Commits: {summary['total_commits']}"))
+        output.append(color_info(f"Active Contributors: {summary['active_contributors']}"))
+        output.append(color_info(f"Active Branches: {summary['active_branches']}/{summary['total_branches']}"))
+        output.append(color_info(f"Files Changed: {summary['total_files_changed']}"))
         output.append("")
         
         # Commit Frequency
-        output.append("📈 COMMIT FREQUENCY")
-        output.append("-" * 40)
+        output.append(color_header("📈 COMMIT FREQUENCY"))
+        output.append(Colors.divider("-", 40))
         commit_freq = report['commit_frequency']
         if commit_freq:
             for author, count in sorted(commit_freq.items(), key=lambda x: x[1], reverse=True)[:10]:
-                output.append(f"{author:20} : {count:3} commits")
+                output.append(f"{color_info(author):20} : {color_success(str(count)):3} commits")
         else:
-            output.append("No commits found in the specified period")
+            output.append(color_warning("No commits found in the specified period"))
         output.append("")
         
         # Branch Analysis
-        output.append("🌿 BRANCH ANALYSIS")
-        output.append("-" * 30)
+        output.append(color_header("🌿 BRANCH ANALYSIS"))
+        output.append(Colors.divider("-", 30))
         branches = report['branch_analysis']
         local_count = sum(1 for b in branches.values() if b['type'] == 'local')
         remote_count = sum(1 for b in branches.values() if b['type'] == 'remote')
         active_count = sum(1 for b in branches.values() if b['status'] == 'active')
         stale_count = len(branches) - active_count
-        output.append(f"Local: {local_count}, Remote: {remote_count}")
-        output.append(f"Active: {active_count}, Stale: {stale_count}")
+        output.append(color_info(f"Local: {local_count}, Remote: {remote_count}"))
+        output.append(color_info(f"Active: {active_count}, Stale: {stale_count}"))
         
         for branch, info in list(branches.items())[:12]:
             status_icon = "🟢" if info['status'] == 'active' else "🔴"
             type_icon = "🏠" if info['type'] == 'local' else "☁️"
             # Show full branch name without truncation
-            output.append(f"{status_icon}{type_icon} {branch:25} ({info['days_inactive']} days)")
+            branch_name = color_branch(branch.replace('local/', '').replace('remote/', ''), info['status'] == 'active')
+            output.append(f"{status_icon}{type_icon} {branch_name:25} ({color_info(str(info['days_inactive']))} days)")
         output.append("")
         
         # File Hotspots
-        output.append("🔥 FILE HOTSPOTS")
-        output.append("-" * 30)
+        output.append(color_header("🔥 FILE HOTSPOTS"))
+        output.append(Colors.divider("-", 30))
         hotspots = report['file_hotspots']
         if hotspots:
             for file_path, count in sorted(hotspots.items(), key=lambda x: x[1], reverse=True)[:10]:
                 # Truncate long file paths
                 file_name = file_path[:25] + "..." if len(file_path) > 25 else file_path
-                output.append(f"{file_name:28} : {count:3} changes")
+                output.append(f"{color_file(file_name):28} : {color_warning(str(count)):3} changes")
         else:
-            output.append("No file changes found in the specified period")
+            output.append(color_warning("No file changes found in the specified period"))
         output.append("")
         
         # Top Contributors
-        output.append("👥 TOP CONTRIBUTORS")
-        output.append("-" * 30)
+        output.append(color_header("👥 TOP CONTRIBUTORS"))
+        output.append(Colors.divider("-", 30))
         contributors = report['contributor_stats']
         top_contributors = sorted(contributors.items(), 
                                 key=lambda x: x[1]['commits'], reverse=True)[:5]
@@ -585,10 +669,10 @@ class FancyGit:
         for name, stats in top_contributors:
             # Truncate long names
             author_name = name[:18] + "..." if len(name) > 18 else name
-            output.append(f"{author_name:18} : {stats['commits']:3} commits, "
-                        f"+{stats['lines_added']} / -{stats['lines_removed']} lines")
+            output.append(f"{color_info(author_name):18} : {color_success(str(stats['commits'])):3} commits, "
+                        f"{color_success('+' + str(stats['lines_added']))} / {color_error('-' + str(stats['lines_removed']))} lines")
         
-        output.append("=" * 60)
+        output.append(Colors.divider("=", 60))
         return "\n".join(output)
 
     def conflict_parser(self):
@@ -664,8 +748,8 @@ def main():
     fancy_git = FancyGit()
     
     if len(sys.argv) < 2:
-        print("Usage: python fancygit.py <command> [args...]")
-        print(f"Available commands: {', '.join(fancy_git.available_commands)}")
+        print(color_error("Usage: python fancygit.py <command> [args...]"))
+        print(color_info(f"Available commands: {', '.join(fancy_git.available_commands)}"))
         sys.exit(1)
     
     command = sys.argv[1]

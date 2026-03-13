@@ -13,24 +13,26 @@ class GitErrorParser:
                 for match in re.findall(f'{pattern}.*', text, re.IGNORECASE):
                     messages.append(GitError(severity = type, source=source, message=match))
         
-        # Common git error patterns
+        # Common git error patterns (more specific to avoid false positives)
         error_patterns = [
-            r'error:',
-            r'fatal:',
-            r'failed',
-            r'rejected',
-            r'conflict',
-            r'merge conflict',
-            r'unable to'
+            r'^error:',
+            r'^fatal:',
+            r'^.*failed:',
+            r'^.*rejected:',
+            r'^merge conflict',
+            r'^unable to',
+            r'^.*error:.*\.git',
+            r'^.*error:.*pathspec'
         ]
         
-        # Common git warning patterns
+        # Common git warning patterns (more specific to avoid false positives)
         warning_patterns = [
-            r'warning:',
-            r'WARNING:',
-            r'behind',
-            r'ahead',
-            r'diverged'
+            r'^warning:',
+            r'^WARNING:',
+            r'^.*behind\s+\d+',
+            r'^.*ahead\s+\d+',
+            r'^.*diverged',
+            r'^.*have diverged'
         ]
 
         scan_patterns(error_patterns, stdout, "error", "stdout")
