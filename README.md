@@ -130,7 +130,7 @@ Fancy_Git/
 ```
 
 *Note: Platform-specific installation scripts (`start.sh`, `start.bat`) are included but automatically managed by `launcher.py`.*
-
+THIS SHOULD BE UPDATED ASAP
 ## Requirements
 
 - Python 3.6+
