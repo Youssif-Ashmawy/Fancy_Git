@@ -177,19 +177,26 @@ class FancyGit:
             previous_model = self.ollama.model  # saves old model
 
             # first switch model to codellama for better explanation
-            if self.ollama.set_model('codellama'):
-                print(f"Switched to model: codellama for explanation DISABLE THIS THIS IS A DEV COMMENT ONLY")
-            else:
+            if not self.ollama.set_model('codellama'):
                 print(f"Failed to switch to model: codellama. Explanation may be less accurate.")
 
             prompt = self.ollama._build_explain_prompt(explain_command)
             
-            print("\n Explanation for command: git", explain_command)
+            print(f"\n Explanation for command: git {explain_command}")
             print("-" * 40)
-            print(self.ollama._call_ollama(prompt))
+            print(f"Switched to `{self.ollama.model}` for better explanations")
+            print("-" * 40)
+            
+            with LoadingContext(animation_type=self.config_manager.config.loading_animation):
+                response = self.ollama._call_ollama(prompt)
+                
+            if response:
+                print(response)
+            else:
+                print("⚠️ Failed to get explanation from Ollama.")
 
             self.ollama.set_model(previous_model)
-            print('switched back to default model')     # COMMENT THESE
+            print(f"Switched back to `{self.ollama.model}`")
             return True
 
         # Handle sync command which will 
@@ -200,12 +207,16 @@ class FancyGit:
         # - create local branches for the new remote branches
         # in just a single command "sync"
         if command == "sync":
-            
-            # by default fetch all first
-            print("Fetching all branches and deleting remote ones....")
+            print("Fetching all branches and pruning deleted remote branches...")
             code, stdout, stderr = self.runner.run_git_command(['fetch', '--all', '--prune'])
-            print(code)
-            print("Done completely!!")
+            
+            if code == 0:
+                if stdout.strip() or stderr.strip():
+                    print(stdout.strip() if stdout.strip() else stderr.strip())
+                print("✅ Fetch completed successfully!")
+            else:
+                print("❌ Failed to fetch branches.")
+                print(stderr)
 
             if '--all-branches' in args:
                 new_branches = self._get_new_branches() # fetch new branches
