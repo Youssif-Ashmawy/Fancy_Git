@@ -1,4 +1,4 @@
-confirmation_enabled=True
-ai_analysis_enabled=True
+confirmation_enabled=False
+ai_analysis_enabled=False
 output_coloring_enabled=True
-loading_animation=run
+loading_animation=dots
