@@ -49,6 +49,8 @@ jobs:
     if: always()
     
     steps:
+    - uses: actions/checkout@v4
+    
     - name: Send email notification on success
       if: needs.test.result == 'success'
       run: |
@@ -56,8 +58,6 @@ jobs:
       env:
         SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
         SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-        SMTP_PORT: ${{ secrets.SMTP_PORT }}
         
     - name: Send email notification on failure
       if: needs.test.result == 'failure'
