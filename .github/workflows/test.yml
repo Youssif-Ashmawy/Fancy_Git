@@ -42,3 +42,23 @@ jobs:
         file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
+        
+    - name: Send email notification on success
+      if: success() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+      run: |
+        python scripts/send_email_notification.py "passed" "${{ github.sha }}" "${{ github.ref_name }}" "${{ github.repository }}"
+      env:
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
+        
+    - name: Send email notification on failure
+      if: failure() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+      run: |
+        python scripts/send_email_notification.py "failed" "${{ github.sha }}" "${{ github.ref_name }}" "${{ github.repository }}"
+      env:
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
