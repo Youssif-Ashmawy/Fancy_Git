@@ -51,6 +51,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Debug email configuration
+      run: |
+        echo "Sender email is configured: ${{ secrets.SENDER_EMAIL != '' }}"
+        echo "Sender password is configured: ${{ secrets.SENDER_PASSWORD != '' }}"
+        echo "Commit author email: $(git log -1 --pretty=format:%ae)"
+        echo "Repository: ${{ github.repository }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+    
     - name: Send email notification on success
       if: needs.test.result == 'success'
       run: |

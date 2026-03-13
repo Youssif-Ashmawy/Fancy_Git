@@ -42,6 +42,12 @@ def send_email_notification(test_status, commit_hash, branch, repo_name, recipie
     sender_email = os.environ.get('SENDER_EMAIL')
     sender_password = os.environ.get('SENDER_PASSWORD')
     
+    print(f"DEBUG: SMTP Server: {smtp_server}")
+    print(f"DEBUG: SMTP Port: {smtp_port}")
+    print(f"DEBUG: Sender Email: {sender_email}")
+    print(f"DEBUG: Recipient Email: {recipient_email}")
+    print(f"DEBUG: Sender Password configured: {'Yes' if sender_password else 'No'}")
+    
     if not sender_email or not sender_password:
         print("Error: SENDER_EMAIL and SENDER_PASSWORD environment variables are required")
         return False
