@@ -10,29 +10,29 @@ class GitErrorParser:
 
         def scan_patterns(patterns, text, type, source):
             for pattern in patterns:
-                for match in re.findall(f'{pattern}.*', text, re.IGNORECASE):
-                    messages.append(GitError(severity = type, source=source, message=match))
+                for match in re.findall(f'{pattern}.*', text, re.IGNORECASE | re.MULTILINE):
+                    messages.append(GitError(severity = type, source=source, message=match.strip()))
         
         # Common git error patterns (more specific to avoid false positives)
         error_patterns = [
-            r'^error:',
-            r'^fatal:',
-            r'^.*failed:',
-            r'^.*rejected:',
-            r'^merge conflict',
-            r'^unable to',
-            r'^.*error:.*\.git',
-            r'^.*error:.*pathspec'
+            r'fatal:',
+            r'error:',
+            r'\bfailed\b',
+            r'\brejected\b',
+            r'merge conflict',
+            r'\bconflict\b',
+            r'unable to',
+            r'\.git.*error:',
+            r'^(?!.*error:).*pathspec.*did not match'
         ]
         
         # Common git warning patterns (more specific to avoid false positives)
         warning_patterns = [
-            r'^warning:',
-            r'^WARNING:',
-            r'^.*behind\s+\d+',
-            r'^.*ahead\s+\d+',
-            r'^.*diverged',
-            r'^.*have diverged'
+            r'warning:',
+            r'WARNING:',
+            r'.*behind.*by\s+\d+.*',
+            r'.*ahead.*by\s+\d+.*',
+            r'\bdiverged\b'
         ]
 
         scan_patterns(error_patterns, stdout, "error", "stdout")

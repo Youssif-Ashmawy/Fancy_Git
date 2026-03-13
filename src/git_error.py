@@ -39,13 +39,17 @@ class GitError:
             'unknown': lambda x: x
         }.get(self.severity, lambda x: x)
         
+        type_str = str(self.type) if self.type is not None else 'None'
+        file_str = str(self.file) if self.file is not None else 'N/A'
+        line_str = str(self.line) if self.line is not None else 'N/A'
+        
         return (
             f"{Colors.divider('=', 60)}\n"
-            f"type: {color_info(str(self.type))}\n"
-            f"source: {color_info(str(self.source))}\n"
-            f"message: {severity_color(str(self.message))}\n"
-            f"severity: {severity_color(str(self.severity))}\n"
-            f"file: {color_file(str(self.file)) if self.file else 'N/A'}\n"
-            f"line: {color_info(str(self.line)) if self.line else 'N/A'}\n"
+            f"type: {type_str}\n"
+            f"source: {str(self.source)}\n"
+            f"message: {str(self.message)}\n"
+            f"severity: {str(self.severity)}\n"
+            f"file: {file_str}\n"
+            f"line: {line_str}\n"
             f"{Colors.divider('=', 60)}"
         )
