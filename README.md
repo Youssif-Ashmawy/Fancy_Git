@@ -4,6 +4,9 @@
 
 A smart CLI tool that provides intelligent recommendations and helps solve merge conflicts by analyzing git command outputs.
 
+## Email Notifications Test
+*Testing email notification system - this change should trigger an email to the commit author.*
+
 ## Overview
 
 FancyGit is a CLI wrapper around git commands that:
