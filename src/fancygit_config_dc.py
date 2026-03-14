@@ -9,4 +9,9 @@ class FancyGitConfig:
     days_for_insights: int = 30
     default_insights_output_format: str = "console"
     open_browser_for_insights: bool = True
-    default_model: str = "llama3.2" 
+    default_ollama_model: str = "llama3.2" 
+    openai_api_key: str = ""  # For future OpenAI integration
+    open_ai_api_base: str = ""  # For future OpenAI integration
+    model_provider: str = "ollama"  # Options: 'ollama', 'openai', 'anthropic'
+    anthropic_api_key: str = ""  # For future Anthropic integration
+    anthropic_api_base: str = ""  # For future Anthropic integration
