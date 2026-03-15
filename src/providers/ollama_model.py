@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from base_model import BaseProvider
+from .base_model import BaseModel
 import requests
 import json
 from typing import List, Dict, Optional
@@ -8,7 +8,7 @@ import time
 from src.config_manager import ConfigManager
 
 
-class OllamaProvider(BaseProvider):
+class OllamaModel(BaseModel):
     """Provider for the Ollama AI model"""
     def __init__(self, config_manager: Optional[ConfigManager] = None):
         # use the provided config manager or create a new one if not provided and load configuration values using load() 

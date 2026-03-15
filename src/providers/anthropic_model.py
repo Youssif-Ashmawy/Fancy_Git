@@ -1,6 +1,6 @@
 from anthropic import Anthropic
 from src.config_manager import ConfigManager
-from base_model import BaseModel
+from .base_model import BaseModel
 from typing import Optional, Dict
 import requests
 

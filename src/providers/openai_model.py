@@ -1,6 +1,6 @@
 import openai
 from openai import AuthenticationError
-from base_model import BaseModel
+from .base_model import BaseModel
 from src.config_manager import ConfigManager
 from typing import Optional, Dict
 import requests

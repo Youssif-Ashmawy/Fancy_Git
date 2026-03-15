@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class BaseProvider(ABC):
+class BaseModel(ABC):
     """Base class for AI models"""
     @abstractmethod
     def test_connection(self) -> bool:
