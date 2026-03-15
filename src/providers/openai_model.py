@@ -1,33 +1,61 @@
-from openai import OpenAI
+import openai
+from openai import AuthenticationError
+from base_model import BaseModel
 from src.config_manager import ConfigManager
+from typing import Optional, Dict
+import requests
 
-class OpenAIModel:
-    def __init__(self, model_name: str = "gpt4all", config_manager: ConfigManager = ConfigManager()):
-        self.config_manager = config_manager
+
+class OpenAIModel(BaseModel):
+    """Provider for the OpenAI API"""
+    def __init__(self, config_manager : Optional[ConfigManager] = None):
+
+        self.config_manager = config_manager or ConfigManager()
+
+        self.base_url = self.config_manager.config.open_ai_api_base
         self.api_key = self.config_manager.config.openai_api_key
-        self.client = OpenAI(api_key=self.api_key)
 
-    def analyze_error_messages(self, error_messages: list[dict]) -> str:
-        """Use OpenAI to analyze error messages and provide insights"""
-        if not self.api_key:
-            raise ValueError("OpenAI API key is not configured. Please set it in .fancygit_config")
-
-        # Prepare the prompt for the AI model
-        prompt = "Analyze the following Git error messages and provide insights:\n\n"
-        for error in error_messages:
-            prompt += f"- {error['severity'].upper()}: {error['message']} (File: {error.get('file', 'N/A')}, Line: {error.get('line', 'N/A')})\n"
-
-        prompt += "\nProvide possible causes and solutions for these errors."
-
-        # Call the OpenAI API to get insights
+    def test_connection(self) -> bool:
+        """Test if OpenAI API is accessible and working"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.config_manager.config.openai_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,
-                temperature=0.7
+            # Attempt to list models to verify connection and authentication
+            # Fortunately the OpenAI Python client library provides a way to list models
+            # this will not waste tokens and is a good way to verify that the API key is valid and the API is reachable
+            response = openai.models.list()
+            return True
+        except AuthenticationError:
+            print("Authentication failed. Please check your OpenAI API key.")
+            return False
+        except Exception as e:
+            print(f"Error connecting to OpenAI API: {e}")
+            return False
+        
+    def get_model_info(self) -> Dict:
+        """Get information about current model"""
+        try:
+            response = openai.models.retrieve(self.config_manager.config.default_openai_model)
+            return dict(response)
+        except AuthenticationError:
+            print("Authentication failed: check your OpenAI API key")
+            return {}
+        except Exception as e:
+            print(f"Error retrieving model info: {e}")
+            return {}
+        
+    def _call_model(self, prompt: str) -> Optional[str]:
+        """Make API call to OpenAI"""
+        try:
+            response = openai.completions.create(
+                model=self.config_manager.config.default_openai_model,
+                prompt=prompt,
+                max_tokens=self.config_manager.config.openai_max_tokens_to_sample,
+                temperature=self.config_manager.config.openai_temperature,
+                top_p=0.9
             )
-            return response.choices[0].message.content.strip()
+            return response.choices[0].text.strip() if response.choices else None   # Extract the generated text from the response
+        except AuthenticationError:
+            print("Authentication failed: check your OpenAI API key")
+            return None
         except Exception as e:
             print(f"Error calling OpenAI API: {e}")
-            return "Failed to analyze error messages due to an API error."
+            return None
