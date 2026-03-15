@@ -33,7 +33,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
-        pip install build twine
+        pip install build
     
     - name: Run tests
       run: |
@@ -63,7 +63,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build twine
+        pip install build
         pip install -r requirements-dev.txt
     
     - name: Configure Git
@@ -149,7 +149,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build twine
+        pip install build
         pip install -r requirements-dev.txt
     
     - name: Get version from tag
@@ -175,10 +175,6 @@ jobs:
     - name: Build package
       run: |
         python -m build
-    
-    - name: Check package
-      run: |
-        twine check dist/*
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -206,14 +202,6 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Publish to PyPI
-      if: secrets.PYPI_API_TOKEN != ''
-      run: |
-        twine upload dist/*
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
   manual-bump:
     runs-on: ubuntu-latest
