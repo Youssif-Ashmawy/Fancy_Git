@@ -12,12 +12,24 @@ def get_version():
 version = get_version()
 
 # Read requirements
-with open("requirements.txt", "r") as f:
-    requirements = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+def get_requirements():
+    try:
+        with open("requirements.txt", "r") as f:
+            return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    except FileNotFoundError:
+        return ["requests>=2.25.0"]
+
+requirements = get_requirements()
 
 # Read README
-with open("README.md", "r", encoding="utf-8") as f:
-    long_description = f.read()
+def get_long_description():
+    try:
+        with open("README.md", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "FancyGit - A smart CLI tool for git"
+
+long_description = get_long_description()
 
 setup(
     name="fancygit",
