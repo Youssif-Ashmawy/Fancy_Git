@@ -1,27 +1,44 @@
-# Continuous Deployment (CD) Pipeline Guide
+# Unified CI/CD Pipeline Guide
 
-This guide explains how to use the CD pipeline for FancyGit to handle patches and releases automatically.
+This guide explains how to use the unified CI/CD pipeline for FancyGit that combines testing and deployment into a single workflow.
 
 ## Overview
 
-The CD pipeline (`deploy.yml`) provides automated deployment for:
+The unified CI/CD pipeline (`ci-cd.yml`) provides:
+- **Automated testing**: Runs tests on multiple Python versions and OS
 - **Patch releases**: Automatic version bumps and releases when pushing to `developer`
 - **Tag releases**: Manual releases when pushing tags
 - **Manual releases**: On-demand releases with version bumping
+- **Email notifications**: Status updates for all operations
+
+## Pipeline Flow
+
+### 1. Test Phase (Always Runs)
+- Runs on `ubuntu-latest`, `windows-latest`, `macos-latest`
+- Tests Python 3.11
+- Unit and integration tests
+- Coverage reporting to Codecov
+
+### 2. Deployment Phase (Runs Only if Tests Pass)
+- **Patch releases**: Automatic on `developer` branch push
+- **Tag releases**: Manual on tag push
+- **Manual releases**: On-demand with version selection
 
 ## Pipeline Triggers
 
 ### 1. Automatic Patch Releases
 - **Trigger**: Push to `developer` branch
+- **Flow**: Tests → If successful → Version bump → Release
 - **Action**: 
   - Bumps patch version (e.g., 1.0.0 → 1.0.1)
   - Creates git tag
   - Builds package
   - Creates GitHub Release
-  - Publishes to PyPI (if configured) -- Maybe Later
+  - Commits version bump (only after successful release)
 
 ### 2. Tag-based Releases
 - **Trigger**: Push tag starting with `v` (e.g., `v1.2.3`)
+- **Flow**: Tests → If successful → Release from tag
 - **Action**:
   - Builds package from tag
   - Creates GitHub Release
@@ -29,6 +46,7 @@ The CD pipeline (`deploy.yml`) provides automated deployment for:
 
 ### 3. Manual Releases
 - **Trigger**: Manual workflow dispatch
+- **Flow**: Tests → If successful → Version bump → Release
 - **Action**:
   - Bumps version (patch/minor/major)
   - Creates git tag
