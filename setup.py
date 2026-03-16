@@ -35,7 +35,7 @@ setup(
     name="fancygit",
     version=version,
     author="Youssif Ashmawy",
-    author_email="youssif@example.com",
+    author_email="ashmawyyoussif@gmail.com",
     description="A smart CLI tool that provides intelligent recommendations and helps solve merge conflicts",
     long_description=long_description,
     long_description_content_type="text/markdown",
