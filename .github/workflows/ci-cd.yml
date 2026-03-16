@@ -86,6 +86,12 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
     
+    - name: Ensure VERSION file exists
+      run: |
+        if [ ! -f "VERSION" ]; then
+          echo "1.0.0" > VERSION
+        fi
+    
     - name: Get current version
       id: version
       run: |
@@ -169,6 +175,12 @@ jobs:
         pip install build
         pip install -r requirements-dev.txt
     
+    - name: Ensure VERSION file exists
+      run: |
+        if [ ! -f "VERSION" ]; then
+          echo "1.0.0" > VERSION
+        fi
+    
     - name: Get version from tag
       id: version
       run: |
@@ -241,6 +253,12 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
+    
+    - name: Ensure VERSION file exists
+      run: |
+        if [ ! -f "VERSION" ]; then
+          echo "1.0.0" > VERSION
+        fi
     
     - name: Get current version
       id: version
