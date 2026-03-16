@@ -1,8 +1,15 @@
 from setuptools import setup, find_packages
+import os
 
-# Read version from VERSION file
-with open("VERSION", "r") as f:
-    version = f.read().strip()
+# Read version from VERSION file or default to 1.0.0
+def get_version():
+    try:
+        with open("VERSION", "r") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "1.0.0"
+
+version = get_version()
 
 # Read requirements
 with open("requirements.txt", "r") as f:
