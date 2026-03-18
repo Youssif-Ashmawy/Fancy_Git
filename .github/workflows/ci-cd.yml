@@ -112,13 +112,42 @@ jobs:
       run: |
         NEW_VERSION=$(cat VERSION)
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
+        echo "New version: $NEW_VERSION"
     
     - name: Build package
       run: |
         echo "Building package with version: $(cat VERSION)"
+        echo "Current dist contents:"
+        ls -la dist/ 2>/dev/null || echo "No dist directory"
         rm -rf dist/ build/ *.egg-info/
+        echo "After cleanup:"
+        ls -la dist/ 2>/dev/null || echo "No dist directory"
         python -m build
+        echo "Built packages:"
+        ls -la dist/
+    
+    - name: Verify package versions
+      run: |
+        echo "Verifying package versions match VERSION file:"
+        EXPECTED_VERSION=$(cat VERSION)
+        echo "Expected version: $EXPECTED_VERSION"
+        
+        for file in dist/*; do
+          if [[ "$file" == *.whl ]]; then
+            echo "Checking wheel: $file"
+            WHEEL_VERSION=$(python -c "import zipfile; z=zipfile.ZipFile('$file'); content=z.read([f for f in z.namelist() if 'METADATA' in f][0]).decode(); print([line.split(': ')[1] for line in content.split('\n') if line.startswith('Version: ')][0])")
+            echo "Wheel version: $WHEEL_VERSION"
+            if [[ "$WHEEL_VERSION" != "$EXPECTED_VERSION" ]]; then
+              echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION, got $WHEEL_VERSION"
+              exit 1
+            else
+              echo "✓ Version matches"
+            fi
+          elif [[ "$file" == *.tar.gz ]]; then
+            echo "Checking sdist: $file"
+            tar -tzf "$file" | grep -E "^[^/]+-$EXPECTED_VERSION\.tar\.gz$" && echo "✓ Sdist version matches" || echo "ERROR: Sdist version mismatch"
+          fi
+        done
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -223,8 +252,37 @@ jobs:
     - name: Build package
       run: |
         echo "Building package with version: $(cat VERSION)"
+        echo "Current dist contents:"
+        ls -la dist/ 2>/dev/null || echo "No dist directory"
         rm -rf dist/ build/ *.egg-info/
+        echo "After cleanup:"
+        ls -la dist/ 2>/dev/null || echo "No dist directory"
         python -m build
+        echo "Built packages:"
+        ls -la dist/
+    
+    - name: Verify package versions
+      run: |
+        echo "Verifying package versions match VERSION file:"
+        EXPECTED_VERSION=$(cat VERSION)
+        echo "Expected version: $EXPECTED_VERSION"
+        
+        for file in dist/*; do
+          if [[ "$file" == *.whl ]]; then
+            echo "Checking wheel: $file"
+            WHEEL_VERSION=$(python -c "import zipfile; z=zipfile.ZipFile('$file'); content=z.read([f for f in z.namelist() if 'METADATA' in f][0]).decode(); print([line.split(': ')[1] for line in content.split('\n') if line.startswith('Version: ')][0])")
+            echo "Wheel version: $WHEEL_VERSION"
+            if [[ "$WHEEL_VERSION" != "$EXPECTED_VERSION" ]]; then
+              echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION, got $WHEEL_VERSION"
+              exit 1
+            else
+              echo "✓ Version matches"
+            fi
+          elif [[ "$file" == *.tar.gz ]]; then
+            echo "Checking sdist: $file"
+            tar -tzf "$file" | grep -E "^[^/]+-$EXPECTED_VERSION\.tar\.gz$" && echo "✓ Sdist version matches" || echo "ERROR: Sdist version mismatch"
+          fi
+        done
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
