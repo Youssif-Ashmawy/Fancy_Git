@@ -131,6 +131,13 @@ jobs:
         # Force rebuild by touching setup.py
         touch setup.py
         
+        # Verify VERSION file content right before build
+        echo "=== VERSION FILE VERIFICATION ==="
+        echo "VERSION file content:"
+        cat VERSION
+        echo "Expected version from workflow: ${{ steps.version.outputs.version }}"
+        echo "=============================="
+        
         # Build fresh packages
         python -m build --no-isolation
         
@@ -276,6 +283,13 @@ jobs:
         
         # Force rebuild by touching setup.py
         touch setup.py
+        
+        # Verify VERSION file content right before build
+        echo "=== VERSION FILE VERIFICATION ==="
+        echo "VERSION file content:"
+        cat VERSION
+        echo "Expected version from workflow: ${{ steps.version.outputs.version }}"
+        echo "=============================="
         
         # Build fresh packages
         python -m build --no-isolation

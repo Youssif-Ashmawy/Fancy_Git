@@ -4,11 +4,17 @@ import os
 # Read version from VERSION file or default to 1.0.0
 def get_version():
     try:
+        # Force fresh read by reopening file
         with open("VERSION", "r") as f:
-            return f.read().strip()
+            f.seek(0)  # Ensure we're at start
+            version = f.read().strip()
+            print(f"DEBUG: Read version '{version}' from VERSION file")
+            return version
     except FileNotFoundError:
+        print("DEBUG: VERSION file not found, using default 1.0.0")
         return "1.0.0"
 
+# Always read fresh version during setup
 version = get_version()
 
 # Read requirements
