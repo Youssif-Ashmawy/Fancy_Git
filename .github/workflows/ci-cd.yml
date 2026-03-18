@@ -319,12 +319,21 @@ jobs:
     - name: Determine overall status
       id: status
       run: |
-        if [[ "${{ needs.test.result }}" == "success" && ("${{ needs.patch.result }}" == "success" || "${{ needs.release.result }}" == "success" || "${{ needs.manual-bump.result }}" == "success") ]]; then
-          echo "status=success" >> $GITHUB_OUTPUT
-        elif [[ "${{ needs.test.result }}" == "failure" ]]; then
-          echo "status=test_failure" >> $GITHUB_OUTPUT
+        TEST_RESULT="${{ needs.test.result }}"
+        PATCH_RESULT="${{ needs.patch.result }}"
+        RELEASE_RESULT="${{ needs.release.result }}"
+        MANUAL_BUMP_RESULT="${{ needs.manual-bump.result }}"
+        
+        echo "DEBUG: test=$TEST_RESULT, patch=$PATCH_RESULT, release=$RELEASE_RESULT, manual-bump=$MANUAL_BUMP_RESULT" >&2
+        
+        if [[ "$TEST_RESULT" == "failure" ]]; then
+          echo "status=failed" >> $GITHUB_OUTPUT
+        elif [[ "$TEST_RESULT" != "success" ]]; then
+          echo "status=failed" >> $GITHUB_OUTPUT
+        elif [[ "$PATCH_RESULT" == "failure" || "$RELEASE_RESULT" == "failure" || "$MANUAL_BUMP_RESULT" == "failure" ]]; then
+          echo "status=failed" >> $GITHUB_OUTPUT
         else
-          echo "status=deploy_failure" >> $GITHUB_OUTPUT
+          echo "status=passed" >> $GITHUB_OUTPUT
         fi
     
     - uses: actions/checkout@v4
