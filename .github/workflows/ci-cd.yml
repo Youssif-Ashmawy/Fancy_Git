@@ -228,13 +228,6 @@ jobs:
         git add VERSION
         git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip ci]"
         git push origin developer
-    
-    - name: Create tag
-      if: success()
-      run: |
-        # Only create tag if PyPI upload was successful
-        git tag -a "v${{ steps.new_version.outputs.new_version }}" -m "Release version ${{ steps.new_version.outputs.new_version }}"
-        git push origin "v${{ steps.new_version.outputs.new_version }}"
 
   # Release deployment - runs only if tests pass and tag pushed or manual
   release:
