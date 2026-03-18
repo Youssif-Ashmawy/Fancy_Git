@@ -119,10 +119,21 @@ jobs:
         echo "Building package with version: $(cat VERSION)"
         echo "Current dist contents:"
         ls -la dist/ 2>/dev/null || echo "No dist directory"
+        
+        # More aggressive cleanup
         rm -rf dist/ build/ *.egg-info/
+        find . -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -name "*.egg" -delete 2>/dev/null || true
+        
         echo "After cleanup:"
         ls -la dist/ 2>/dev/null || echo "No dist directory"
-        python -m build
+        
+        # Force rebuild by touching setup.py
+        touch setup.py
+        
+        # Build fresh packages
+        python -m build --no-isolation
+        
         echo "Built packages:"
         ls -la dist/
     
@@ -254,10 +265,21 @@ jobs:
         echo "Building package with version: $(cat VERSION)"
         echo "Current dist contents:"
         ls -la dist/ 2>/dev/null || echo "No dist directory"
+        
+        # More aggressive cleanup
         rm -rf dist/ build/ *.egg-info/
+        find . -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -name "*.egg" -delete 2>/dev/null || true
+        
         echo "After cleanup:"
         ls -la dist/ 2>/dev/null || echo "No dist directory"
-        python -m build
+        
+        # Force rebuild by touching setup.py
+        touch setup.py
+        
+        # Build fresh packages
+        python -m build --no-isolation
+        
         echo "Built packages:"
         ls -la dist/
     
