@@ -1,0 +1,5 @@
+include VERSION
+include README.md
+include *.md
+recursive-include src *.py
+recursive-include tests *.py
