@@ -143,6 +143,17 @@ jobs:
         
         echo "Built packages:"
         ls -la dist/
+        
+        # Debug: Show what setup.py actually read during build
+        echo "=== BUILD DEBUG INFO ==="
+        echo "Current directory: $(pwd)"
+        echo "VERSION file exists: $([ -f VERSION ] && echo 'YES' || echo 'NO')"
+        if [ -f VERSION ]; then
+          echo "VERSION file content: '$(cat VERSION)'"
+        else
+          echo "VERSION file not found!"
+        fi
+        echo "===================="
     
     - name: Verify package versions
       run: |
@@ -296,6 +307,17 @@ jobs:
         
         echo "Built packages:"
         ls -la dist/
+        
+        # Debug: Show what setup.py actually read during build
+        echo "=== BUILD DEBUG INFO ==="
+        echo "Current directory: $(pwd)"
+        echo "VERSION file exists: $([ -f VERSION ] && echo 'YES' || echo 'NO')"
+        if [ -f VERSION ]; then
+          echo "VERSION file content: '$(cat VERSION)'"
+        else
+          echo "VERSION file not found!"
+        fi
+        echo "===================="
     
     - name: Verify package versions
       run: |
