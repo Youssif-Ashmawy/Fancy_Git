@@ -148,7 +148,13 @@ jobs:
     - name: Publish to PyPI
       run: |
         if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
-          twine upload dist/*
+          echo "Checking if version ${{ steps.new_version.outputs.new_version }} already exists on PyPI..."
+          if python3 -c "import requests; r=requests.get(f'https://pypi.org/pypi/fancygit/${{ steps.new_version.outputs.new_version }}/json'); exit(0 if r.status_code==200 else 1)" 2>/dev/null; then
+            echo "Version ${{ steps.new_version.outputs.new_version }} already exists on PyPI, skipping upload"
+          else
+            echo "Uploading new version ${{ steps.new_version.outputs.new_version }} to PyPI..."
+            twine upload dist/* --verbose
+          fi
         else
           echo "PYPI_API_TOKEN not configured, skipping PyPI publish"
         fi
@@ -246,7 +252,13 @@ jobs:
     - name: Publish to PyPI
       run: |
         if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
-          twine upload dist/*
+          echo "Checking if version ${{ steps.version.outputs.version }} already exists on PyPI..."
+          if python3 -c "import requests; r=requests.get(f'https://pypi.org/pypi/fancygit/${{ steps.version.outputs.version }}/json'); exit(0 if r.status_code==200 else 1)" 2>/dev/null; then
+            echo "Version ${{ steps.version.outputs.version }} already exists on PyPI, skipping upload"
+          else
+            echo "Uploading new version ${{ steps.version.outputs.version }} to PyPI..."
+            twine upload dist/* --verbose
+          fi
         else
           echo "PYPI_API_TOKEN not configured, skipping PyPI publish"
         fi
