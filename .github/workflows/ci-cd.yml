@@ -112,10 +112,12 @@ jobs:
       run: |
         NEW_VERSION=$(cat VERSION)
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "New version: $NEW_VERSION"
+        echo "Version: $VERSION"
     
     - name: Build package
       run: |
+        echo "Building package with version: $(cat VERSION)"
+        rm -rf dist/ build/ *.egg-info/
         python -m build
     
     - name: Create GitHub Release
@@ -220,6 +222,8 @@ jobs:
     
     - name: Build package
       run: |
+        echo "Building package with version: $(cat VERSION)"
+        rm -rf dist/ build/ *.egg-info/
         python -m build
     
     - name: Create GitHub Release
