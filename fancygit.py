@@ -4,16 +4,34 @@ import re
 import sys
 import os
 import webbrowser
-from src.git_runner import GitRunner
-from src.git_error_parser import GitErrorParser
-from src.git_error import GitError
-from src.mermaid_export import MermaidExporter
-from src.git_insights import GitInsights
-from src.ollama_client import OllamaClient
-from src.loading_animation import LoadingContext
-from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
-from src.output_colorizer import OutputColorizer
-from welcome import show_welcome
+
+# Handle both direct execution and module import
+try:
+    from src.git_runner import GitRunner
+    from src.git_error_parser import GitErrorParser
+    from src.git_error import GitError
+    from src.mermaid_export import MermaidExporter
+    from src.git_insights import GitInsights
+    from src.ollama_client import OllamaClient
+    from src.loading_animation import LoadingContext
+    from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
+    from src.output_colorizer import OutputColorizer
+    from welcome import show_welcome
+except ImportError:
+    # When installed as a module, add the current directory to path
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, current_dir)
+    
+    from src.git_runner import GitRunner
+    from src.git_error_parser import GitErrorParser
+    from src.git_error import GitError
+    from src.mermaid_export import MermaidExporter
+    from src.git_insights import GitInsights
+    from src.ollama_client import OllamaClient
+    from src.loading_animation import LoadingContext
+    from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
+    from src.output_colorizer import OutputColorizer
+    from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
 # Add script directory to Python path so imports work from anywhere
