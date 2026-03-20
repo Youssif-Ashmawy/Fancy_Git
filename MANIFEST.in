@@ -1,5 +1,8 @@
 include VERSION
 include README.md
 include *.md
+include command-list.txt
+include .fancygit_config
+include welcome.py
 recursive-include src *.py
 recursive-include tests *.py
