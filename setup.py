@@ -46,7 +46,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Youssif-Ashmawy/Fancy_Git",
-    py_modules=["fancygit"],
+    packages=find_packages(),
+    py_modules=["fancygit", "welcome"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
