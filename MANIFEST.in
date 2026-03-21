@@ -4,5 +4,8 @@ include *.md
 include command-list.txt
 include .fancygit_config
 include welcome.py
+include fancygit.py
 recursive-include src *.py
 recursive-include tests *.py
+global-exclude *.pyc
+global-exclude __pycache__

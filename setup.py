@@ -48,6 +48,10 @@ setup(
     url="https://github.com/Youssif-Ashmawy/Fancy_Git",
     packages=find_packages(),
     py_modules=["fancygit", "welcome"],
+    package_data={
+        "": ["command-list.txt", ".fancygit_config"],
+    },
+    include_package_data=True,
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
