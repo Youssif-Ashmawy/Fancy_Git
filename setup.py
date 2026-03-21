@@ -49,7 +49,7 @@ setup(
     packages=find_packages(),
     py_modules=["fancygit", "welcome"],
     package_data={
-        "": ["command-list.txt", ".fancygit_config"],
+        "": ["command-list.txt", ".fancygit_config", "VERSION", "README.md", "*.md"],
     },
     include_package_data=True,
     classifiers=[
@@ -66,9 +66,5 @@ setup(
         "console_scripts": [
             "fancygit=fancygit:main",
         ],
-    },
-    include_package_data=True,
-    package_data={
-        "": ["VERSION", "README.md", "*.md"],
     },
 )
