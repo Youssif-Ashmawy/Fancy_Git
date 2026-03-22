@@ -26,7 +26,58 @@ class MermaidExporter:
             out = f'n_{out}'
         return out
 
+    def _get_node_style(self, node_type: str, importance: str = 'normal') -> str:
+        """Get CSS styling for nodes based on type and importance"""
+        styles = {
+            'critical': 'fill:#dc2626,stroke:#991b1b,color:#fff,font-weight:bold',
+            'important': 'fill:#ea580c,stroke:#c2410c,color:#fff,font-weight:bold', 
+            'normal': 'fill:#3b82f6,stroke:#2563eb,color:#fff',
+            'secondary': 'fill:#6b7280,stroke:#4b5563,color:#fff',
+            'success': 'fill:#059669,stroke:#047857,color:#fff',
+            'warning': 'fill:#d97706,stroke:#b45309,color:#fff',
+            'error': 'fill:#dc2626,stroke:#991b1b,color:#fff'
+        }
+        return styles.get(importance, styles['normal'])
+
+    def _calculate_file_importance(self, file_path: str) -> str:
+        """Calculate file importance for better visualization"""
+        file_name = os.path.basename(file_path).lower()
+        
+        # Critical source files
+        if file_path.endswith(('.py', '.js', '.ts', '.java', '.cpp', '.c', '.h')):
+            if file_name in ['main.py', 'app.py', 'index.js', 'app.ts', '__init__.py']:
+                return 'critical'
+            return 'important'
+        
+        # Configuration and documentation
+        elif file_path.endswith(('.md', '.txt', '.json', '.yaml', '.yml', '.toml', '.cfg', '.ini')):
+            if file_name in ['readme.md', 'package.json', 'requirements.txt', 'setup.py']:
+                return 'important'
+            return 'normal'
+        
+        # Build and dependency files
+        elif file_path.endswith(('.lock', 'pipfile', 'dockerfile', 'makefile')):
+            return 'important'
+        
+        # Hidden and cache files
+        elif file_name.startswith('.') or file_path.endswith(('.pyc', '.pyo', '.pyd')):
+            return 'secondary'
+        
+        # Test files
+        elif 'test' in file_path.lower() or file_path.endswith(('.test.js', '.spec.js', '_test.py')):
+            return 'normal'
+        
+        return 'normal'
+
     def _escape_label(self, value: str) -> str:
+        """Escape labels for Mermaid diagrams"""
+        # Remove all whitespace that could cause line breaks
+        value = value.replace('&gt;', '>').replace('&lt;', '<').replace('&amp;', '&')
+        value = value.replace('\n', ' ').replace('\r', '').replace('\t', ' ')
+        # Replace multiple spaces with single space
+        import re
+        value = re.sub(r'\s+', ' ', value)
+        # Escape quotes but keep other characters
         return value.replace('"', "'")
 
     def _parse_gitignore(self, repo_root: str) -> set[str]:
@@ -130,16 +181,66 @@ class MermaidExporter:
         def node(mod: str) -> str:
             return self._sanitize_node_id(mod)
 
+        # Calculate importance for modules
+        module_imports_count = {}
+        for src, dst in edges:
+            module_imports_count[src] = module_imports_count.get(src, 0) + 1
+            module_imports_count[dst] = module_imports_count.get(dst, 0) + 1
+
         mods = sorted({m for e in edges for m in e})
         for m in mods:
-            lines.append(f'  {node(m)}["{self._escape_label(m)}"]')
+            importance = self._calculate_module_importance(m, module_imports_count.get(m, 0))
+            icon = self._get_module_icon(m)
+            label = f'{icon} {self._escape_label(m)}'
+            lines.append(f'  {node(m)}["{label}"]')
+            lines.append(f'  class {node(m)} {importance}')
 
+        # Add edges with styling
         for a, b in sorted(edges):
             lines.append(f'  {node(a)} --> {node(b)}')
 
+        # Add styling classes
+        lines.extend([
+            '  classDef critical fill:#dc2626,stroke:#991b1b,color:#fff,font-weight:bold;',
+            '  classDef important fill:#ea580c,stroke:#c2410c,color:#fff,font-weight:bold;',
+            '  classDef normal fill:#3b82f6,stroke:#2563eb,color:#fff;',
+            '  classDef secondary fill:#6b7280,stroke:#4b5563,color:#fff;'
+        ])
+
         return '\n'.join(lines) + '\n'
 
-    def repo_file_structure_flowchart(self, repo_root: str, max_nodes: int = 250) -> str:
+    def _calculate_module_importance(self, module_name: str, import_count: int) -> str:
+        """Calculate importance of a module based on name and usage"""
+        # Critical modules
+        if module_name in ['main', 'app', '__init__', 'index'] or import_count > 5:
+            return 'critical'
+        
+        # Important modules
+        if any(keyword in module_name.lower() for keyword in ['core', 'utils', 'config', 'models']) or import_count > 2:
+            return 'important'
+        
+        # Test modules are secondary
+        if 'test' in module_name.lower():
+            return 'secondary'
+        
+        return 'normal'
+
+    def _get_module_icon(self, module_name: str) -> str:
+        """Get appropriate icon for module type"""
+        if module_name in ['main', 'app', '__init__']:
+            return '🚀'
+        elif 'test' in module_name.lower():
+            return '🧪'
+        elif any(keyword in module_name.lower() for keyword in ['config', 'settings']):
+            return '⚙️'
+        elif any(keyword in module_name.lower() for keyword in ['util', 'helper']):
+            return '🛠️'
+        elif any(keyword in module_name.lower() for keyword in ['model', 'data']):
+            return '📊'
+        else:
+            return '📦'
+
+    def repo_file_structure_flowchart(self, repo_root: str, max_nodes: int = 75) -> str:
         lines = ['flowchart TB']
         ignore_patterns = self._parse_gitignore(repo_root)
 
@@ -148,10 +249,14 @@ class MermaidExporter:
 
         root_id = 'repo_root'
         root_label = self._escape_label(os.path.basename(os.path.abspath(repo_root)) or 'repo')
+        root_style = self._get_node_style('directory', 'critical')
         lines.append(f'  {root_id}["{root_label}"]')
+        lines.append(f'  class {root_id} critical')
 
         node_count = 1
         ids: dict[str, str] = {repo_root: root_id}
+        important_files = []
+        normal_files = []
 
         for current_root, dirs, files in os.walk(repo_root):
             dirs[:] = [d for d in dirs if not skip_dir(d)]
@@ -163,10 +268,11 @@ class MermaidExporter:
                 parent_id = self._sanitize_node_id(f'path_{rel_root}')
                 ids[parent_path] = parent_id
                 label = self._escape_label(rel_root)
-                lines.append(f'  {parent_id}["{label}"]')
+                lines.append(f'  {parent_id}["{label}/"]')
                 lines.append(f'  {root_id} --> {parent_id}')
                 node_count += 1
 
+            # Process directories
             for d in dirs:
                 if node_count >= max_nodes:
                     break
@@ -174,6 +280,10 @@ class MermaidExporter:
                 rel = os.path.relpath(p, repo_root)
                 nid = self._sanitize_node_id(f'dir_{rel}')
                 ids[p] = nid
+                
+                # Style important directories differently
+                importance = 'important' if d in ['src', 'lib', 'app', 'components'] else 'normal'
+                style = self._get_node_style('directory', importance)
                 lines.append(f'  {nid}["{self._escape_label(d)}/"]')
                 lines.append(f'  {parent_id} --> {nid}')
                 node_count += 1
@@ -181,26 +291,52 @@ class MermaidExporter:
             if node_count >= max_nodes:
                 break
 
+            # Categorize files by importance
             show_files = [f for f in sorted(files) if not f.endswith('.pyc') and f != '.DS_Store']
-            for f in show_files[:30]:
+            for f in show_files[:12]:  # Show fewer files per directory for smaller diagrams
                 if node_count >= max_nodes:
                     break
                 p = os.path.join(current_root, f)
                 rel = os.path.relpath(p, repo_root)
                 nid = self._sanitize_node_id(f'file_{rel}')
-                lines.append(f'  {nid}["{self._escape_label(f)}"]')
-                lines.append(f'  {parent_id} --> {nid}')
+                
+                importance = self._calculate_file_importance(p)
+                if importance in ['critical', 'important']:
+                    important_files.append((nid, f, parent_id, importance))
+                else:
+                    normal_files.append((nid, f, parent_id, importance))
+                
                 node_count += 1
 
-            if len(show_files) > 30 and node_count < max_nodes:
+            if len(show_files) > 12 and node_count < max_nodes:
                 more_id = self._sanitize_node_id(f'file_{rel_root}_more')
-                lines.append(f'  {more_id}["... +{len(show_files) - 30} more"]')
+                lines.append(f'  {more_id}["... +{len(show_files) - 12} more"]')
                 lines.append(f'  {parent_id} --> {more_id}')
                 node_count += 1
+
+        # Add important files first with styling
+        for nid, f, parent_id, importance in important_files:
+            lines.append(f'  {nid}["{self._escape_label(f)}"]')
+            lines.append(f'  {parent_id} --> {nid}')
+            lines.append(f'  class {nid} {importance}')
+
+        # Add normal files
+        for nid, f, parent_id, importance in normal_files:
+            lines.append(f'  {nid}["{self._escape_label(f)}"]')
+            lines.append(f'  {parent_id} --> {nid}')
+            lines.append(f'  class {nid} {importance}')
 
         if node_count >= max_nodes:
             lines.append(f'  cutoff["(truncated at ~{max_nodes} nodes)"]')
             lines.append(f'  {root_id} --> cutoff')
+
+        # Add CSS classes for styling
+        lines.extend([
+            '  classDef critical fill:#dc2626,stroke:#991b1b,color:#fff,font-weight:bold;',
+            '  classDef important fill:#ea580c,stroke:#c2410c,color:#fff,font-weight:bold;',
+            '  classDef normal fill:#3b82f6,stroke:#2563eb,color:#fff;',
+            '  classDef secondary fill:#6b7280,stroke:#4b5563,color:#fff;'
+        ])
 
         return '\n'.join(lines) + '\n'
 
@@ -218,22 +354,42 @@ class MermaidExporter:
 
         lines = [
             'flowchart TB',
-            f'  repo["Repo"] --> branch["Branch: {self._escape_label(branch)}"]',
-            f'  branch --> sync["Sync: ahead {ahead} / behind {behind}"]',
-            f'  repo --> clean["Clean: {str(clean).lower()}"]',
-            '  repo --> buckets{Working Tree}',
-            f'  buckets --> staged["Staged ({len(staged)})"]',
-            f'  buckets --> modified["Modified ({len(modified)})"]',
-            f'  buckets --> untracked["Untracked ({len(untracked)})"]',
-            f'  buckets --> conflicts["Conflicts ({len(conflicts)})"]',
+            f'  repo["📁 Repository"] --> branch["🌿 Branch: {self._escape_label(branch)}"]',
+            f'  branch --> sync["🔄 Sync: ↑{ahead} ↓{behind}"]',
+            f'  repo --> clean["✨ Clean: {str(clean).lower()}"]',
+            '  repo --> buckets{💼 Working Tree}',
+            f'  buckets --> staged["📋 Staged ({len(staged)})"]',
+            f'  buckets --> modified["✏️ Modified ({len(modified)})"]',
+            f'  buckets --> untracked["❓ Untracked ({len(untracked)})"]',
+            f'  buckets --> conflicts["⚠️ Conflicts ({len(conflicts)})"]',
         ]
 
-        def add_file_nodes(group_id: str, files: list[str]):
-            for idx, f in enumerate(files[:30]):
+        # Style based on status
+        clean_style = 'success' if clean else 'warning'
+        sync_style = 'normal' if ahead == 0 and behind == 0 else 'important' if ahead > 0 else 'secondary'
+        
+        lines.extend([
+            f'  class repo critical;',
+            f'  class branch important;',
+            f'  class sync {sync_style};',
+            f'  class clean {clean_style};',
+            f'  class staged important;',
+            f'  class modified warning;',
+            f'  class untracked secondary;',
+            f'  class conflicts error;',
+        ])
+
+        def add_file_nodes(group_id: str, files: list[str], max_show: int = 5):
+            for idx, f in enumerate(files[:max_show]):
                 node_id = f'{group_id}_{idx}'
-                lines.append(f'  {group_id} --> {node_id}["{self._escape_label(f)}"]')
-            if len(files) > 30:
-                lines.append(f'  {group_id} --> {group_id}_more["... +{len(files) - 30} more"]')
+                # Add file type icons and truncate long names
+                icon = '🐍' if f.endswith('.py') else '📄' if f.endswith('.md') else '📄'
+                clean_name = f.replace('\n', ' ').replace('\r', ' ').strip()
+                if len(clean_name) > 25:
+                    clean_name = clean_name[:22] + '...'
+                lines.append(f'  {group_id} --> {node_id}["{icon} {self._escape_label(clean_name)}"]')
+            if len(files) > max_show:
+                lines.append(f'  {group_id} --> {group_id}_more["... +{len(files) - max_show} more"]')
 
         add_file_nodes('staged', staged)
         add_file_nodes('modified', modified)
@@ -241,17 +397,18 @@ class MermaidExporter:
         add_file_nodes('conflicts', conflicts)
 
         lines.extend([
-            '  classDef bad fill:#7f1d1d,stroke:#fecaca,color:#fff;',
-            '  classDef warn fill:#78350f,stroke:#fed7aa,color:#fff;',
-            '  class conflicts bad;',
+            '  classDef critical fill:#dc2626,stroke:#991b1b,color:#fff,font-weight:bold;',
+            '  classDef important fill:#ea580c,stroke:#c2410c,color:#fff,font-weight:bold;',
+            '  classDef normal fill:#3b82f6,stroke:#2563eb,color:#fff;',
+            '  classDef secondary fill:#6b7280,stroke:#4b5563,color:#fff;',
+            '  classDef success fill:#059669,stroke:#047857,color:#fff;',
+            '  classDef warning fill:#d97706,stroke:#b45309,color:#fff;',
+            '  classDef error fill:#dc2626,stroke:#991b1b,color:#fff;',
         ])
-
-        if len(modified) > 0 or len(untracked) > 0:
-            lines.append('  class modified,untracked warn;')
 
         return '\n'.join(lines) + '\n'
 
-    def commit_graph_gitgraph(self, max_commits: int = 40) -> str:
+    def commit_graph_gitgraph(self, max_commits: int = 15) -> str:
         args = [
             'log',
             f'-n{max_commits}',
@@ -267,25 +424,28 @@ class MermaidExporter:
 
         lines = ['flowchart TD']
 
-        # Use flowchart for vertical layout to improve commit readability
         commits = []
         for raw in stdout.splitlines():
             parts = raw.split('\x1f')
             if len(parts) != 5:
                 continue
             _full, short, decos, date, subject = parts
-            label = f'{short} {date} {subject}'.strip()
-            if decos.strip():
-                label = f'{label} {decos.strip()}'
+            
+            # Simple clean label
+            clean_subject = subject.replace('\n', ' ').replace('\r', ' ').strip()
+            if len(clean_subject) > 50:
+                clean_subject = clean_subject[:50] + '...'
+            
+            label = f'{short} {date} {clean_subject}'
             label = self._escape_label(label)
             commits.append((short, label))
 
-        # Create nodes for each commit
+        # Create simple nodes
         for i, (short, label) in enumerate(commits):
             node_id = self._sanitize_node_id(f'commit_{short}')
             lines.append(f'  {node_id}["{label}"]')
 
-        # Create vertical connections between commits
+        # Create connections
         for i in range(len(commits) - 1):
             current_id = self._sanitize_node_id(f'commit_{commits[i][0]}')
             next_id = self._sanitize_node_id(f'commit_{commits[i+1][0]}')
@@ -293,99 +453,534 @@ class MermaidExporter:
 
         return '\n'.join(lines) + '\n'
 
-    def build_html(self, diagrams: dict, title: str = 'FancyGit Mermaid') -> str:
+    def build_html(self, diagrams: dict, title: str = 'FancyGit Repository Visualization') -> str:
         payload = json.dumps(diagrams)
         now = datetime.now().isoformat(timespec='seconds')
 
         return textwrap.dedent(
             f"""\
             <!doctype html>
-            <html lang=\"en\">
+            <html lang="en">
               <head>
-                <meta charset=\"utf-8\" />
-                <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width,initial-scale=1" />
                 <title>{self._escape_label(title)}</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
                 <style>
-                  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 24px; }}
-                  h1 {{ margin: 0 0 6px 0; font-size: 18px; }}
-                  .meta {{ color: #6b7280; font-size: 12px; margin-bottom: 16px; }}
-                  .grid {{ display: grid; grid-template-columns: 1fr; gap: 20px; }}
-                  .card {{ border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; background: #fff; }}
-                  .card h2 {{ margin: 0 0 12px 0; font-size: 14px; color: #111827; }}
+                  :root {{
+                    --bg-primary: #ffffff;
+                    --bg-secondary: #f8fafc;
+                    --bg-tertiary: #f1f5f9;
+                    --text-primary: #1e293b;
+                    --text-secondary: #64748b;
+                    --text-tertiary: #94a3b8;
+                    --border: #e2e8f0;
+                    --accent: #3b82f6;
+                    --accent-hover: #2563eb;
+                    --success: #059669;
+                    --warning: #d97706;
+                    --error: #dc2626;
+                    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                  }}
+
+                  [data-theme="dark"] {{
+                    --bg-primary: #0f172a;
+                    --bg-secondary: #1e293b;
+                    --bg-tertiary: #334155;
+                    --text-primary: #f8fafc;
+                    --text-secondary: #cbd5e1;
+                    --text-tertiary: #94a3b8;
+                    --border: #334155;
+                    --accent: #60a5fa;
+                    --accent-hover: #3b82f6;
+                  }}
+
+                  * {{
+                    box-sizing: border-box;
+                  }}
+
+                  body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    background: var(--bg-secondary);
+                    color: var(--text-primary);
+                    line-height: 1.6;
+                  }}
+
+                  .container {{
+                    max-width: 1400px;
+                    margin: 0 auto;
+                    padding: 20px;
+                  }}
+
+                  .header {{
+                    background: var(--bg-primary);
+                    border-bottom: 1px solid var(--border);
+                    padding: 20px 0;
+                    margin-bottom: 24px;
+                    box-shadow: var(--shadow);
+                  }}
+
+                  .header-content {{
+                    max-width: 1400px;
+                    margin: 0 auto;
+                    padding: 0 20px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 16px;
+                  }}
+
+                  .header-left {{
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    flex: 1;
+                  }}
+
+                  h1 {{
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                  }}
+
+                  .logo {{
+                    width: 80px;
+                    height: 80px;
+                    background-image: url('../images/light_background_logo.png');
+                    background-size: contain;
+                    background-repeat: no-repeat;
+                    background-position: center;
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-right: 20px;
+                  }}
+                  
+                  [data-theme="dark"] .logo {{
+                    background-image: url('../images/dark_background_logo.png');
+                  }}
+
+                  .meta {{
+                    color: var(--text-secondary);
+                    font-size: 14px;
+                  }}
+
+                  .controls {{
+                    display: flex;
+                    gap: 12px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                  }}
+
+                  .btn {{
+                    padding: 8px 16px;
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    background: var(--bg-primary);
+                    color: var(--text-primary);
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    text-decoration: none;
+                  }}
+
+                  .btn:hover {{
+                    background: var(--bg-tertiary);
+                    border-color: var(--accent);
+                  }}
+
+                  .btn-primary {{
+                    background: var(--accent);
+                    color: white;
+                    border-color: var(--accent);
+                  }}
+
+                  .btn-primary:hover {{
+                    background: var(--accent-hover);
+                    border-color: var(--accent-hover);
+                  }}
+
+                  .btn-icon {{
+                    padding: 8px;
+                    background: transparent;
+                    border: 1px solid transparent;
+                  }}
+
+                  .btn-icon:hover {{
+                    background: var(--bg-tertiary);
+                  }}
+
+                  .tabs {{
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 24px;
+                    border-bottom: 1px solid var(--border);
+                    overflow-x: auto;
+                  }}
+
+                  .tab {{
+                    padding: 12px 20px;
+                    background: transparent;
+                    border: none;
+                    border-bottom: 2px solid transparent;
+                    color: var(--text-secondary);
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                  }}
+
+                  .tab:hover {{
+                    color: var(--text-primary);
+                    background: var(--bg-tertiary);
+                  }}
+
+                  .tab.active {{
+                    color: var(--accent);
+                    border-bottom-color: var(--accent);
+                  }}
+
+                  .tab-content {{
+                    display: none;
+                  }}
+
+                  .tab-content.active {{
+                    display: block;
+                  }}
+
+                  .card {{
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    padding: 24px;
+                    box-shadow: var(--shadow);
+                    margin-bottom: 20px;
+                  }}
+
+                  .card-header {{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                    gap: 12px;
+                  }}
+
+                  .card-title {{
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                    margin: 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                  }}
+
+                  .card-actions {{
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                  }}
+
+                  .mermaid {{
+                    min-height: 500px;
+                    border-radius: 8px;
+                    overflow: auto;
+                    background: var(--bg-tertiary);
+                    padding: 20px;
+                    font-size: 14px;
+                  }}
+
+                  .source-code {{
+                    background: var(--bg-tertiary);
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                    font-size: 12px;
+                    line-height: 1.4;
+                    overflow: auto;
+                    max-height: 400px;
+                    white-space: pre-wrap;
+                    color: var(--text-primary);
+                  }}
+
+                  @media (max-width: 768px) {{
+                    .container {{
+                      padding: 12px;
+                    }}
+                    
+                    .header-content {{
+                      flex-direction: column;
+                      align-items: stretch;
+                    }}
+                    
+                    .controls {{
+                      justify-content: center;
+                    }}
+                    
+                    .search-box input {{
+                      width: 100%;
+                    }}
+                    
+                    .tabs {{
+                      gap: 4px;
+                    }}
+                    
+                    .tab {{
+                      padding: 8px 12px;
+                      font-size: 13px;
+                    }}
+                  }}
+
                   svg .cluster > text {{ display: none; }}
                   svg g.cluster-label text {{ display: none; }}
-                  pre {{ overflow: auto; padding: 12px; border-radius: 8px; background: #0b1020; color: #d1d5db; font-size: 12px; }}
-                  .toolbar {{ display:flex; gap: 10px; align-items:center; margin-bottom: 12px; }}
-                  button {{ padding: 6px 10px; font-size: 12px; border-radius: 8px; border: 1px solid #d1d5db; background:#f9fafb; cursor:pointer; }}
-                  button:hover {{ background:#f3f4f6; }}
                 </style>
               </head>
               <body>
-                <h1>{self._escape_label(title)}</h1>
-                <div class=\"meta\">Generated: {now}</div>
+                <div class="header">
+                  <div class="header-content">
+                    <div class="header-left">
+                      <div class="logo"></div>
+                      <div>
+                        <h1>{self._escape_label(title)}</h1>
+                        <div class="meta">Generated: {now}</div>
+                      </div>
+                    </div>
+                    <div class="controls">
+                      <button class="btn btn-icon" id="themeToggle" title="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-                <div id=\"root\" class=\"grid\"></div>
+                <div class="container">
+                  <div class="tabs" id="tabContainer"></div>
+                  <div id="contentContainer"></div>
+                </div>
 
                 <script>
                   const diagrams = {payload};
-                  const root = document.getElementById('root');
+                  const diagramNames = Object.keys(diagrams);
+                  let currentTheme = 'light';
+                  let activeTab = 0;
 
-                  function mkCard(name, code) {{
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    const h2 = document.createElement('h2');
-                    h2.textContent = name;
-
-                    const toolbar = document.createElement('div');
-                    toolbar.className = 'toolbar';
-                    const copyBtn = document.createElement('button');
-                    copyBtn.textContent = 'Copy Mermaid';
-                    copyBtn.onclick = async () => {{
-                      await navigator.clipboard.writeText(code);
-                      copyBtn.textContent = 'Copied';
-                      setTimeout(() => copyBtn.textContent = 'Copy Mermaid', 900);
-                    }};
-
-                    const toggleBtn = document.createElement('button');
-                    toggleBtn.textContent = 'Show source';
-
-                    const mermaidDiv = document.createElement('div');
-                    mermaidDiv.className = 'mermaid';
-                    mermaidDiv.textContent = code;
-
-                    const pre = document.createElement('pre');
-                    pre.style.display = 'none';
-                    pre.textContent = code;
-
-                    toggleBtn.onclick = () => {{
-                      const show = pre.style.display === 'none';
-                      pre.style.display = show ? 'block' : 'none';
-                      toggleBtn.textContent = show ? 'Hide source' : 'Show source';
-                    }};
-
-                    toolbar.appendChild(copyBtn);
-                    toolbar.appendChild(toggleBtn);
-
-                    card.appendChild(h2);
-                    card.appendChild(toolbar);
-                    card.appendChild(mermaidDiv);
-                    card.appendChild(pre);
-                    return card;
+                  function initializeTabs() {{
+                    const tabContainer = document.getElementById('tabContainer');
+                    const contentContainer = document.getElementById('contentContainer');
+                    
+                    diagramNames.forEach((name, index) => {{
+                      const tab = document.createElement('button');
+                      tab.className = 'tab' + (index === 0 ? ' active' : '');
+                      tab.innerHTML = `<i class="fas fa-diagram-project"></i> ${{name}}`;
+                      tab.onclick = () => switchTab(index);
+                      tabContainer.appendChild(tab);
+                      
+                      const content = document.createElement('div');
+                      content.className = 'tab-content' + (index === 0 ? ' active' : '');
+                      content.innerHTML = createTabContent(name, diagrams[name], index);
+                      contentContainer.appendChild(content);
+                    }});
                   }}
 
-                  Object.entries(diagrams).forEach(([name, code]) => root.appendChild(mkCard(name, code)));
+                  function createTabContent(name, code, index) {{
+                    return `
+                      <div class="card">
+                        <div class="card-header">
+                          <h2 class="card-title">
+                            <i class="fas fa-diagram-project"></i>
+                            ${{name}}
+                          </h2>
+                          <div class="card-actions">
+                            <button class="btn" onclick="copyToClipboard(${{index}})">
+                              <i class="fas fa-copy"></i>
+                              Copy
+                            </button>
+                            <button class="btn" onclick="toggleSource(${{index}})">
+                              <i class="fas fa-code"></i>
+                              Source
+                            </button>
+                          </div>
+                        </div>
+                        <div class="mermaid" id="mermaid-${{index}}" data-diagram-index="${{index}}">${{code}}</div>
+                        <div class="source-code" id="source-${{index}}" style="display: none;">${{code}}</div>
+                      </div>
+                    `;
+                  }}
+
+                  function renderMermaidInTab(content, index) {{
+                    const mermaidDiv = content.querySelector('.mermaid');
+                    if (!mermaidDiv || mermaidDiv.getAttribute('data-processed') === 'true') {{
+                      return;
+                    }}
+                    if (typeof mermaid === 'undefined' || !mermaid.render) {{
+                      return;
+                    }}
+
+                    const code = mermaidDiv.textContent.trim();
+                    const diagramId = `mermaid-${{index}}-svg`;
+
+                    mermaid.render(diagramId, code).then(function(result) {{
+                      mermaidDiv.innerHTML = result.svg;
+                      mermaidDiv.setAttribute('data-processed', 'true');
+                    }}).catch(function(error) {{
+                      console.error('Mermaid rendering error:', error);
+                      mermaidDiv.innerHTML = '<div style="color: red; padding: 20px; border: 1px solid red; border-radius: 4px;">Error rendering diagram: ' + error.message + '</div>';
+                    }});
+                  }}
+
+                  function switchTab(index) {{
+                    const tabs = document.querySelectorAll('.tab');
+                    const contents = document.querySelectorAll('.tab-content');
+                    
+                    tabs.forEach((tab, i) => {{
+                      tab.classList.toggle('active', i === index);
+                    }});
+                    
+                    contents.forEach((content, i) => {{
+                      const isActive = i === index;
+                      content.classList.toggle('active', isActive);
+                      
+                      if (isActive) {{
+                        renderMermaidInTab(content, index);
+                      }}
+                    }});
+                    
+                    activeTab = index;
+                  }}
+
+                  function copyToClipboard(index) {{
+                    const name = diagramNames[index];
+                    const code = diagrams[name];
+                    navigator.clipboard.writeText(code).then(() => {{
+                      showNotification('Copied to clipboard!');
+                    }});
+                  }}
+
+                  function toggleSource(index) {{
+                    const source = document.getElementById(`source-${{index}}`);
+                    const isVisible = source.style.display !== 'none';
+                    source.style.display = isVisible ? 'none' : 'block';
+                  }}
+
+                  function showNotification(message) {{
+                    const notification = document.createElement('div');
+                    notification.style.cssText = `
+                      position: fixed;
+                      top: 20px;
+                      right: 20px;
+                      background: var(--accent);
+                      color: white;
+                      padding: 12px 20px;
+                      border-radius: 8px;
+                      box-shadow: var(--shadow-lg);
+                      z-index: 1000;
+                      animation: slideIn 0.3s ease;
+                    `;
+                    notification.textContent = message;
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {{
+                      notification.remove();
+                    }}, 3000);
+                  }}
+
+                  function toggleTheme() {{
+                    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', currentTheme);
+                    const icon = document.querySelector('#themeToggle i');
+                    icon.className = currentTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+                    localStorage.setItem('theme', currentTheme);
+                  }}
+
+                  function expandAll() {{
+                    // Function removed - no longer needed
+                  }}
+
+                  function exportAll() {{
+                    // Function removed - no longer needed
+                  }}
+
+                  function setupSearch() {{
+                    // Function removed - no longer needed
+                  }}
+
+                  function setupFilters() {{
+                    // Function removed - no longer needed
+                  }}
+
+                  document.addEventListener('DOMContentLoaded', () => {{
+                    const savedTheme = localStorage.getItem('theme') || 'light';
+                    currentTheme = savedTheme;
+                    document.documentElement.setAttribute('data-theme', currentTheme);
+                    
+                    document.getElementById('themeToggle').onclick = toggleTheme;
+                    
+                    initializeTabs();
+                  }});
                 </script>
 
-                <script type=\"module\">
-                  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                  mermaid.initialize({{ startOnLoad: true, theme: 'default' }});
+                <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+                <script>
+                  // Initialize Mermaid with proper settings
+                  document.addEventListener('DOMContentLoaded', function() {{
+                    mermaid.initialize({{ 
+                      startOnLoad: false,
+                      theme: 'default',
+                      themeVariables: {{
+                        primaryColor: '#3b82f6',
+                        primaryTextColor: '#1e293b',
+                        primaryBorderColor: '#2563eb',
+                        lineColor: '#64748b',
+                        secondaryColor: '#f1f5f9',
+                        tertiaryColor: '#f8fafc',
+                        fontSize: '16px',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
+                      }},
+                      flowchart: {{
+                        useMaxWidth: false,
+                        htmlLabels: true,
+                        curve: 'basis',
+                        padding: 20,
+                        nodeSpacing: 50,
+                        rankSpacing: 80
+                      }},
+                      securityLevel: 'loose',
+                      fontSize: 16
+                    }});
+
+                    // Render only the active tab on load (inactive tabs render on-demand)
+                    const activeContent = document.querySelector('.tab-content.active');
+                    if (activeContent) {{
+                      const indexAttr = activeContent.querySelector('.mermaid')?.getAttribute('data-diagram-index');
+                      const index = indexAttr ? parseInt(indexAttr, 10) : 0;
+                      if (typeof renderMermaidInTab === 'function') {{
+                        renderMermaidInTab(activeContent, index);
+                      }}
+                    }}
+                  }});
                 </script>
               </body>
             </html>
             """
         )
 
-    def export_all(self, output_dir: str, repo_state: dict, max_commits: int = 40) -> dict:
+    def export_all(self, output_dir: str, repo_state: dict, max_commits: int = 15) -> dict:
         os.makedirs(output_dir, exist_ok=True)
 
         repo_root = os.getcwd()

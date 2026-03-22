@@ -8,11 +8,15 @@ class CustomBuildPy(_build_py):
         # Run the original build command
         _build_py.run(self)
         
-        # Copy data files to the build directory alongside fancygit.py
+        # Copy data files to build directory alongside fancygit.py
         build_lib = os.path.join(self.build_lib, '')
         if os.path.exists(build_lib):
             shutil.copy('command-list.txt', os.path.join(build_lib, 'command-list.txt'))
             shutil.copy('.fancygit_config', os.path.join(build_lib, '.fancygit_config'))
+            # Copy images folder for logo files
+            if os.path.exists('images'):
+                shutil.copytree('images', os.path.join(build_lib, 'images'))
+
 import os
 
 # Read version from VERSION file or default to 1.0.0
