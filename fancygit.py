@@ -69,12 +69,30 @@ class FancyGit:
         """Dynamically load commands from command-list.txt file"""
         script_dir = os.path.dirname(os.path.realpath(__file__)) # Get the directory where this script is located (real-path)
         commands_file = os.path.join(script_dir, 'command-list.txt')
-        try:
+        
+        # Try the current directory first (for development/editable installs)
+        if os.path.exists(commands_file):
             with open(commands_file, 'r') as f:
                 return [line.strip() for line in f if line.strip()]
-        except FileNotFoundError:
-            print(color_warning(f"Warning: {commands_file} not found. No commands available."))
-            return []
+        
+        # Try site-packages root directory (for PyPI wheel installs)
+        # Get the site-packages directory where this module is installed
+        import sys
+        if hasattr(sys, '_MEIPASS'):
+            # PyInstaller
+            site_packages_dir = sys._MEIPASS
+        else:
+            # Regular pip install - get the directory containing this module
+            site_packages_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        
+        commands_file = os.path.join(site_packages_dir, 'command-list.txt')
+        
+        if os.path.exists(commands_file):
+            with open(commands_file, 'r') as f:
+                return [line.strip() for line in f if line.strip()]
+        
+        print(color_warning(f"Warning: {commands_file} not found. No commands available."))
+        return []
     
     def _load_confirmation_state(self):
         """Load confirmation state from config file"""

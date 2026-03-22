@@ -1,4 +1,18 @@
 from setuptools import setup, find_packages
+from setuptools.command.build_py import build_py as _build_py
+import os
+import shutil
+
+class CustomBuildPy(_build_py):
+    def run(self):
+        # Run the original build command
+        _build_py.run(self)
+        
+        # Copy data files to the build directory alongside fancygit.py
+        build_lib = os.path.join(self.build_lib, '')
+        if os.path.exists(build_lib):
+            shutil.copy('command-list.txt', os.path.join(build_lib, 'command-list.txt'))
+            shutil.copy('.fancygit_config', os.path.join(build_lib, '.fancygit_config'))
 import os
 
 # Read version from VERSION file or default to 1.0.0
@@ -48,10 +62,8 @@ setup(
     url="https://github.com/Youssif-Ashmawy/Fancy_Git",
     packages=find_packages(),
     py_modules=["fancygit", "welcome"],
-    package_data={
-        "": ["command-list.txt", ".fancygit_config", "VERSION", "README.md", "*.md"],
-    },
     include_package_data=True,
+    cmdclass={'build_py': CustomBuildPy},
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
