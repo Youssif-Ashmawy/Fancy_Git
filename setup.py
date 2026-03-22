@@ -54,8 +54,8 @@ long_description = get_long_description()
 setup(
     name="fancygit",
     version=version,
-    author="Youssif Ashmawy and Omar Ossama",
-    author_email="ashmawyyoussif@gmail.com",
+    author=["Youssif Ashmawy", "Omar Ossama"],
+    author_email=["ashmawyyoussif@gmail.com", "omaroymk@gmail.com"],
     description="A smart CLI tool that provides intelligent recommendations and helps solve merge conflicts",
     long_description=long_description,
     long_description_content_type="text/markdown",
