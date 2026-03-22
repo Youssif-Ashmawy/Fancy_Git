@@ -54,12 +54,12 @@ long_description = get_long_description()
 setup(
     name="fancygit",
     version=version,
-    author="Youssif Ashmawy",
+    author="Youssif Ashmawy and Omar Ossama",
     author_email="ashmawyyoussif@gmail.com",
     description="A smart CLI tool that provides intelligent recommendations and helps solve merge conflicts",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/Youssif-Ashmawy/Fancy_Git",
+    license="Apache License 2.0",
     packages=find_packages(),
     py_modules=["fancygit", "welcome"],
     include_package_data=True,
@@ -67,7 +67,7 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3.11",
         "Topic :: Software Development :: Version Control :: Git",
