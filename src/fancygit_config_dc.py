@@ -24,7 +24,7 @@ class FancyGitConfig:
     ollama_temperature: float = 0.3
     ollama_max_tokens_to_sample: int = 500
 
-    openai_api_key: str = "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"
+    openai_api_key: str = ""
     open_ai_api_base: str = ""
     default_openai_model: str = "gpt-4"  # For future OpenAI integration
     openai_temperature: float = 0.3  # For future OpenAI integration
