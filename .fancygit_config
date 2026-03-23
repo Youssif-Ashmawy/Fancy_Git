@@ -15,15 +15,13 @@ ollama_max_retries=3
 ollama_temperature=0.3
 ollama_max_tokens_to_sample=300
 
-openai_api_key=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
-open_ai_api_base=""
-default_openai_model="gpt-4"
+openai_api_key=""
 openai_temperature=0.3
 openai_max_tokens_to_sample=300
 
 model_provider="ollama"
 
-anthropic_api_key="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"
+anthropic_api_key=""
 anthropic_api_base=""
 anthropic_max_tokens_timeout=5
 default_anthropic_model="claude-2"
