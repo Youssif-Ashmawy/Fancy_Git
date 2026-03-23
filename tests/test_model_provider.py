@@ -4,6 +4,28 @@ from src.model_provider import ModelProvider
 from src.config_manager import ConfigManager
 from src.providers.base_model import BaseModel
 
+# Try to import provider modules, but handle missing dependencies gracefully
+try:
+    from src.providers.ollama_model import OllamaModel
+    OLLAMA_AVAILABLE = True
+except ImportError:
+    OLLAMA_AVAILABLE = False
+    OllamaModel = None
+
+try:
+    from src.providers.openai_model import OpenAIModel
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAIModel = None
+
+try:
+    from src.providers.anthropic_model import AnthropicModel
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+    AnthropicModel = None
+
 @pytest.mark.unit
 class TestModelProvider:
     """Test cases for Model Provider factory class"""
@@ -12,6 +34,7 @@ class TestModelProvider:
         """Setup method called before each test"""
         self.mock_config_manager = MagicMock(spec=ConfigManager)
     
+    @pytest.mark.skipif(not OLLAMA_AVAILABLE, reason="Ollama dependencies not available")
     @patch('src.providers.ollama_model.OllamaModel')
     def test_get_model_ollama(self, mock_ollama_model):
         """Test getting Ollama model instance"""
@@ -23,6 +46,7 @@ class TestModelProvider:
         assert result == mock_ollama_instance
         mock_ollama_model.assert_called_once_with(config_manager=self.mock_config_manager)
     
+    @pytest.mark.skipif(not OPENAI_AVAILABLE, reason="OpenAI dependencies not available")
     @patch('src.providers.openai_model.OpenAIModel')
     def test_get_model_openai(self, mock_openai_model):
         """Test getting OpenAI model instance"""

@@ -20,11 +20,13 @@ class TestFancyGitCommands:
             'merge', 'rebase', 'reset', 'log', 'diff', 'stash', 'rm', 'mv',
             'welcome', 'confirmation', 'ai', 'colors', 'insights', 'visualize'
         ]):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
+            with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
+                with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
+                    with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
+                        with patch('builtins.input', return_value='y'):
                             self.fancy_git = FancyGit()
+                            # Disable confirmation directly on config
+                            self.fancy_git.config_manager.config.confirmation_enabled = False
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_add_command_success(self, mock_run_git):
@@ -251,11 +253,13 @@ class TestFancyGitSpecialCommands:
         with patch.object(FancyGit, '_load_commands', return_value=[
             'welcome', 'confirmation', 'ai', 'colors', 'insights', 'visualize'
         ]):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=True):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
+            with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
+                with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
+                    with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
+                        with patch('builtins.input', return_value='y'):
                             self.fancy_git = FancyGit()
+                            # Set confirmation to True for testing confirmation commands
+                            self.fancy_git.config_manager.config.confirmation_enabled = True
     
     def test_welcome_command(self):
         """Test welcome command"""
@@ -297,18 +301,18 @@ class TestFancyGitSpecialCommands:
             assert result is True
             mock_print.assert_called()
     
-    @patch('src.ollama_client.OllamaClient.test_connection')
+    @patch('src.ai_engine.AIEngine.test_connection')
     def test_ai_command_toggle(self, mock_test_connection):
         """Test AI command toggle"""
         mock_test_connection.return_value = True
         initial_state = self.fancy_git.ai_analysis_enabled
         
-        result = self.fancy_git.execute_command('ai')
+        result = self.fancy_git.execute_command('ai', 'toggle')
         
         assert result is True
         assert self.fancy_git.ai_analysis_enabled != initial_state
     
-    @patch('src.ollama_client.OllamaClient.test_connection')
+    @patch('src.ai_engine.AIEngine.test_connection')
     def test_ai_command_enable(self, mock_test_connection):
         """Test AI command enable"""
         mock_test_connection.return_value = True
@@ -322,15 +326,13 @@ class TestFancyGitSpecialCommands:
         """Test AI command disable"""
         result = self.fancy_git.execute_command('ai', 'off')
         
-        assert isinstance(result, bool)  # The method returns the current state
+        assert result is True
         assert self.fancy_git.ai_analysis_enabled is False
     
-    @patch('src.ollama_client.OllamaClient.get_available_models')
-    @patch('src.ollama_client.OllamaClient.test_connection')
-    def test_ai_command_status(self, mock_test_connection, mock_get_models):
+    @patch('src.ai_engine.AIEngine.test_connection')
+    def test_ai_command_status(self, mock_test_connection):
         """Test AI command status"""
         mock_test_connection.return_value = True
-        mock_get_models.return_value = ['llama2', 'mistral']
         
         with patch('builtins.print') as mock_print:
             result = self.fancy_git.execute_command('ai', 'status')

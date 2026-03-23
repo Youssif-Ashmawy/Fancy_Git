@@ -20,11 +20,13 @@ class TestFancyGitAdvancedCommands:
             'notes', 'range-diff', 'restore', 'revert', 'shortlog', 'show',
             'sparse-checkout', 'submodule', 'switch', 'tag', 'worktree', 'log', 'status'
         ]):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
+            with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
+                with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
+                    with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
+                        with patch('builtins.input', return_value='y'):
                             self.fancy_git = FancyGit()
+                            # Disable confirmation directly on config
+                            self.fancy_git.config_manager.config.confirmation_enabled = False
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_archive_command(self, mock_run_git):
