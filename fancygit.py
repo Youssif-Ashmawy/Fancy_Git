@@ -136,69 +136,6 @@ class FancyGit:
         print(color_warning(f"Warning: {commands_file} not found. No commands available."))
         return []
     
-    ## Keep these functions for now
-    def _load_confirmation_state(self):
-        """Load confirmation state from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('confirmation_enabled='):
-                        return line.strip().split('=')[1].lower() == 'true'
-        except FileNotFoundError:
-            pass
-        return True  # Default to enabled
-    
-    def _load_ai_analysis_state(self):
-        """Load AI analysis state from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('ai_analysis_enabled='):
-                        return line.strip().split('=')[1].lower() == 'true'
-        except FileNotFoundError:
-            pass
-        return True  # Default to enabled
-    
-    def _load_animation_type(self):
-        """Load loading animation type from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('loading_animation='):
-                        anim_type = line.strip().split('=')[1].strip()
-                        valid_types = ['run', 'dots', 'progress', 'matrix', 'brain']
-                        if anim_type in valid_types:
-                            return anim_type
-        except FileNotFoundError:
-            pass
-        return 'dots'  # Default to dots animation
-    
-    def _load_output_coloring_state(self):
-        """Load output coloring state from config file"""
-        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        try:
-            with open(config_file, 'r') as f:
-                for line in f:
-                    if line.startswith('output_coloring_enabled='):
-                        return line.strip().split('=')[1].lower() == 'true'
-        except FileNotFoundError:
-            pass
-        return True  # Default to enabled
-    
-    def _save_confirmation_state(self):
-        """Save confirmation state to config file"""
-        try:
-            with open(self.config_file, 'w') as f:
-                f.write(f'confirmation_enabled={self.confirmation_enabled}\n')
-                f.write(f'ai_analysis_enabled={self.ai_analysis_enabled}\n')
-                f.write(f'output_coloring_enabled={self.output_coloring_enabled}\n')
-                f.write(f'loading_animation={self.loading_animation_type}\n')
-        except Exception as e:
-            print(color_warning(f"Warning: Could not save confirmation state: {e}"))
-    
     def toggle_confirmation(self, enable=None):
         """Toggle confirmation messages before executing commands
         

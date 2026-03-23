@@ -20,13 +20,14 @@ class TestFancyGitCommands:
             'merge', 'rebase', 'reset', 'log', 'diff', 'stash', 'rm', 'mv',
             'welcome', 'confirmation', 'ai', 'colors', 'insights', 'visualize'
         ]):
-            with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                    with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
-                        with patch('builtins.input', return_value='y'):
-                            self.fancy_git = FancyGit()
-                            # Disable confirmation directly on config
-                            self.fancy_git.config_manager.config.confirmation_enabled = False
+            with patch('src.config_manager.ConfigManager'):
+                with patch('builtins.input', return_value='y'):
+                    self.fancy_git = FancyGit()
+                    # Configure test settings
+                    self.fancy_git.config_manager.config.ai_analysis_enabled = False
+                    self.fancy_git.config_manager.config.output_coloring_enabled = False
+                    self.fancy_git.config_manager.config.loading_animation = 'dots'
+                    self.fancy_git.config_manager.config.confirmation_enabled = False
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_add_command_success(self, mock_run_git):

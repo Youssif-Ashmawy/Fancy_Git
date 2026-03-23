@@ -20,10 +20,12 @@ class TestConflictParserIntegration:
         """Setup method called before each test"""
         # Initialize FancyGit with mocked config
         with patch.object(FancyGit, '_load_commands', return_value=['add', 'commit', 'push', 'pull']):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=True):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_animation_type', return_value='simple'):
-                        self.fancy_git = FancyGit()
+            with patch('src.config_manager.ConfigManager'):
+                self.fancy_git = FancyGit()
+                # Configure test settings
+                self.fancy_git.config_manager.config.confirmation_enabled = True
+                self.fancy_git.config_manager.config.ai_analysis_enabled = False
+                self.fancy_git.config_manager.config.loading_animation = 'simple'
     
     def test_conflict_parser_no_conflicts(self, temp_git_repo):
         """Test conflict parser when no conflicts exist"""

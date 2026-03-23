@@ -19,11 +19,13 @@ class TestFancyGitCommandWorkflows:
             'merge', 'rebase', 'reset', 'log', 'diff', 'stash', 'rm', 'mv', 'revert',
             'welcome', 'confirmation', 'ai', 'colors', 'insights', 'visualize'
         ]):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
-                            self.fancy_git = FancyGit()
+            with patch('src.config_manager.ConfigManager'):
+                self.fancy_git = FancyGit()
+                # Configure test settings
+                self.fancy_git.config_manager.config.confirmation_enabled = False
+                self.fancy_git.config_manager.config.ai_analysis_enabled = False
+                self.fancy_git.config_manager.config.output_coloring_enabled = False
+                self.fancy_git.config_manager.config.loading_animation = 'dots'
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_complete_add_commit_workflow(self, mock_run_git):
@@ -211,11 +213,13 @@ class TestFancyGitSpecialCommandWorkflows:
             'merge', 'rebase', 'reset', 'log', 'diff', 'stash', 'rm', 'mv',
             'welcome', 'confirmation', 'ai', 'colors', 'insights', 'visualize'
         ]):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
-                            self.fancy_git = FancyGit()
+            with patch('src.config_manager.ConfigManager'):
+                self.fancy_git = FancyGit()
+                # Configure test settings
+                self.fancy_git.config_manager.config.confirmation_enabled = False
+                self.fancy_git.config_manager.config.ai_analysis_enabled = False
+                self.fancy_git.config_manager.config.output_coloring_enabled = False
+                self.fancy_git.config_manager.config.loading_animation = 'dots'
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_ai_error_analysis_workflow(self, mock_run_git):
@@ -345,11 +349,13 @@ class TestFancyGitErrorRecoveryWorkflows:
     def setup_method(self):
         """Setup method called before each test"""
         with patch.object(FancyGit, '_load_commands', return_value=['add', 'commit', 'push', 'pull', 'status']):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
-                            self.fancy_git = FancyGit()
+            with patch('src.config_manager.ConfigManager'):
+                self.fancy_git = FancyGit()
+                # Configure test settings
+                self.fancy_git.config_manager.config.confirmation_enabled = False
+                self.fancy_git.config_manager.config.ai_analysis_enabled = False
+                self.fancy_git.config_manager.config.output_coloring_enabled = False
+                self.fancy_git.config_manager.config.loading_animation = 'dots'
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_network_error_recovery(self, mock_run_git):
