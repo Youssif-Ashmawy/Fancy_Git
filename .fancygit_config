@@ -1,9 +1,6 @@
-confirmation_enabled=False
 ai_analysis_enabled=False
 output_coloring_enabled=True
-loading_animation=dots
 confirmation_enabled=True
-ai_analysis_enabled=True
 loading_animation=run
 
 max_visualization_commits=40
