@@ -24,8 +24,6 @@ class TestAIIntegration:
         self.mock_config_manager.config.translation_provider = "anthropic"
         self.mock_config_manager.config.ai_analysis_enabled = True
         self.mock_config_manager.config.ollama_max_retries = 3
-        self.mock_config_manager.config.ollama_host = "http://localhost:11434"
-        self.mock_config_manager.config.ollama_model = "llama2"
         self.mock_config_manager.config.openai_api_key = "test-key"
         self.mock_config_manager.config.openai_model = "gpt-3.5-turbo"
         self.mock_config_manager.config.anthropic_api_key = "test-key"

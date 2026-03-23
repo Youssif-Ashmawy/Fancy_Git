@@ -72,9 +72,6 @@ def mock_config_manager():
     mock_config.translation_provider = "ollama"
     mock_config.ai_analysis_enabled = True
     mock_config.loading_animation = "dots"
-    mock_config.ollama_host = "http://localhost:11434"
-    mock_config.ollama_model = "llama2"
-    mock_config.ollama_timeout = 30
     mock_config.ollama_max_retries = 3
     mock_config.openai_api_key = "test-key"
     mock_config.openai_model = "gpt-3.5-turbo"
@@ -131,8 +128,6 @@ translation_provider=anthropic
 ai_analysis_enabled=true
 loading_animation=spinner
 ollama_max_retries=5
-ollama_host=http://localhost:11434
-ollama_model=llama2
 """
     with open(config_path, 'w') as f:
         f.write(config_content)
