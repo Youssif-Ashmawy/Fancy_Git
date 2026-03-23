@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ developer, merge_branch ]
+    branches: [ developer, main ]
     tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
@@ -62,7 +62,7 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     needs: test
-    if: (github.ref == 'refs/heads/developer' || github.ref == 'refs/heads/merge_branch') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/developer' || github.ref == 'refs/heads/main') && github.event_name == 'push'
     
     steps:
     - uses: actions/checkout@v4
