@@ -322,7 +322,7 @@ class TestFancyGitSpecialCommands:
         """Test AI command disable"""
         result = self.fancy_git.execute_command('ai', 'off')
         
-        assert result is True
+        assert result is False  # Returns the new state (disabled)
         assert self.fancy_git.ai_analysis_enabled is False
     
     def test_ai_command_status(self):
@@ -341,7 +341,7 @@ class TestFancyGitSpecialCommands:
         
         result = self.fancy_git.execute_command('colors')
         
-        assert result is True
+        assert result is not initial_state  # Returns the new state (opposite of initial)
         assert self.fancy_git.output_coloring_enabled != initial_state
     
     def test_colors_command_enable(self):
