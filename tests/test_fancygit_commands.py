@@ -306,7 +306,7 @@ class TestFancyGitSpecialCommands:
             
             result = self.fancy_git.execute_command('ai', 'toggle')
             
-            assert result is True
+            assert result is not initial_state  # Returns the new state (opposite of initial)
             assert self.fancy_git.ai_analysis_enabled != initial_state
     
     def test_ai_command_enable(self):
