@@ -1,5 +1,5 @@
 import openai
-from openai import AuthenticationError
+from openai import AuthenticationError, OpenAI
 from .base_model import BaseModel
 from src.config_manager import ConfigManager
 from typing import Optional, Dict
@@ -12,8 +12,12 @@ class OpenAIModel(BaseModel):
 
         self.config_manager = config_manager or ConfigManager()
 
-        self.base_url = self.config_manager.config.open_ai_api_base
         self.api_key = self.config_manager.config.openai_api_key
+        self.base_url = self.config_manager.config.open_ai_api_base
+
+        # create a client instance with the API key and base URL (if provided)
+        client = OpenAI(api_key=self.api_key)
+        self.client = client
 
     def test_connection(self) -> bool:
         """Test if OpenAI API is accessible and working"""
@@ -21,7 +25,8 @@ class OpenAIModel(BaseModel):
             # Attempt to list models to verify connection and authentication
             # Fortunately the OpenAI Python client library provides a way to list models
             # this will not waste tokens and is a good way to verify that the API key is valid and the API is reachable
-            response = openai.models.list()
+            response = self.client.models.list()
+            print()
             return True
         except AuthenticationError:
             print("Authentication failed. Please check your OpenAI API key.")
@@ -33,7 +38,7 @@ class OpenAIModel(BaseModel):
     def get_model_info(self) -> Dict:
         """Get information about current model"""
         try:
-            response = openai.models.retrieve(self.config_manager.config.default_openai_model)
+            response = self.client.models.retrieve(self.config_manager.config.default_openai_model)
             return dict(response)
         except AuthenticationError:
             print("Authentication failed: check your OpenAI API key")
@@ -45,7 +50,7 @@ class OpenAIModel(BaseModel):
     def _call_model(self, prompt: str) -> Optional[str]:
         """Make API call to OpenAI"""
         try:
-            response = openai.completions.create(
+            response = self.client.completions.create(
                 model=self.config_manager.config.default_openai_model,
                 prompt=prompt,
                 max_tokens=self.config_manager.config.openai_max_tokens_to_sample,

@@ -39,10 +39,10 @@ class TestGitError:
         error = GitError(source="stdout", message="test")
         
         with pytest.raises(AttributeError):
-            error.source = "stderr"
+            error.source = "stderr" # type: ignore
         
         with pytest.raises(AttributeError):
-            error.message = "changed"
+            error.message = "changed"   #type: ignore
     
     def test_git_error_str_representation(self):
         """Test string representation of GitError"""

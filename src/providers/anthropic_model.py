@@ -9,15 +9,16 @@ class AnthropicModel(BaseModel):
         self.config_manager = config_manager or ConfigManager()
 
         self.api_key = self.config_manager.config.anthropic_api_key
-        self.base_url = self.config_manager.config.anthropic_api_base
+        self.base_url = "https://api.anthropic.com"
         self.max_tokens_timeout = self.config_manager.config.anthropic_max_tokens_timeout
+
+        self.client = Anthropic(api_key=self.api_key, base_url=self.base_url)
 
     def test_connection(self) -> bool:
         try:
             # Unfortunately for Anthropic there is no simple endpoint to test the connection without making a full API call
             # so we will just attempt to make a simple API call with an empty prompt to verify the connection and authentication
-            client = Anthropic(api_key=self.api_key, base_url=self.base_url)
-            response = client.completions.create(model="claude-2", prompt="Test connection", max_tokens_to_sample=self.max_tokens_timeout)
+            response = self.client.completions.create(model="claude-2", prompt="Test connection", max_tokens_to_sample=self.max_tokens_timeout)
             return True if response else False
         except Exception as e:
             print(f"Error connecting to Anthropic API: {e}")
@@ -32,8 +33,7 @@ class AnthropicModel(BaseModel):
     
     def _call_model(self, prompt: str) -> Optional[str]:
         try:
-            client = Anthropic(api_key=self.api_key, base_url=self.base_url)
-            response = client.completions.create(       # returns a dataclass with a 'completion' field that contains the generated text
+            response = self.client.completions.create(       # returns a dataclass with a 'completion' field that contains the generated text
                 model=self.config_manager.config.default_anthropic_model,
                 prompt=prompt,
                 max_tokens_to_sample=500,

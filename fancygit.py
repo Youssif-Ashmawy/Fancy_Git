@@ -9,7 +9,7 @@ from src.git_error_parser import GitErrorParser
 from src.git_error import GitError
 from src.mermaid_export import MermaidExporter
 from src.git_insights import GitInsights
-from src.ollama_client import OllamaClient
+from src.ai_engine import AIEngine
 from src.loading_animation import LoadingContext
 from src.config_manager import ConfigManager
 from welcome import show_welcome
@@ -35,7 +35,7 @@ class FancyGit:
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
         self.insights = GitInsights(self.runner)
-        self.ollama = OllamaClient()
+        self.ai_engine = AIEngine(self.config_manager)
         self.available_commands = self._load_commands()
     
     def _load_commands(self):
@@ -92,10 +92,9 @@ class FancyGit:
         status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
         print(f"AI error analysis {status}")
         
-        # Check Ollama connection when enabling
-        if self.config_manager.config.ai_analysis_enabled and not self.ollama.test_connection():
-            print("⚠️  Warning: Cannot connect to Ollama. Make sure Ollama is running on localhost:11434")
-            print("   Install Ollama from https://ollama.ai/ and run 'ollama serve'")
+        # Check AI provider connection when enabling
+        if self.config_manager.config.ai_analysis_enabled and not self.ai_engine.analysis_provider.test_connection():
+            print("⚠️  Warning: Cannot connect to AI provider. Make sure it's running.")
             self.config_manager.config.ai_analysis_enabled = False
             self.config_manager.save_config()
             return False
@@ -174,29 +173,18 @@ class FancyGit:
                 return True
             
             explain_command = args[0]
-            previous_model = self.ollama.model  # saves old model
-
-            # first switch model to codellama for better explanation
-            if not self.ollama.set_model('codellama'):
-                print(f"Failed to switch to model: codellama. Explanation may be less accurate.")
-
-            prompt = self.ollama._build_explain_prompt(explain_command)
             
             print(f"\n Explanation for command: git {explain_command}")
             print("-" * 40)
-            print(f"Switched to `{self.ollama.model}` for better explanations")
-            print("-" * 40)
             
             with LoadingContext(animation_type=self.config_manager.config.loading_animation):
-                response = self.ollama._call_ollama(prompt)
+                response = self.ai_engine.explain_command(explain_command)
                 
             if response:
                 print(response)
             else:
-                print("⚠️ Failed to get explanation from Ollama.")
+                print("⚠️ Failed to get explanation from AI.")
 
-            self.ollama.set_model(previous_model)
-            print(f"Switched back to `{self.ollama.model}`")
             return True
 
         # Handle sync command which will 
@@ -283,30 +271,44 @@ class FancyGit:
                     status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
                     print(f"AI error analysis is {status}")
                     if self.config_manager.config.ai_analysis_enabled:
-                        if self.ollama.test_connection():
-                            models = self.ollama.get_available_models()
-                            print(f"Using model: {self.ollama.model}")
-                            if models:
-                                print(f"Available models: {', '.join(models[:5])}")
+                        if self.ai_engine.analysis_provider.test_connection():
+                            # get_available_models and model are Ollama-specific
+                            from src.providers.ollama_model import OllamaModel
+                            if isinstance(self.ai_engine.analysis_provider, OllamaModel):
+                                models = self.ai_engine.analysis_provider.get_available_models()
+                                print(f"Using model: {self.ai_engine.analysis_provider.model}")
+                                if models:
+                                    print(f"Available models: {', '.join(models[:5])}")
+                            else:
+                                print(f"Using provider: {self.config_manager.config.analysis_provider}")
                         else:
-                            print("⚠️  Ollama is not connected")
+                            print("⚠️  AI provider is not connected")
                     print(f"Loading animation: {self.config_manager.config.loading_animation}")
                     return self.config_manager.config.ai_analysis_enabled
                 elif arg in ['models', 'list']:
-                    models = self.ollama.get_available_models()
-                    if models:
-                        print(f"Available Ollama models: {', '.join(models)}")
-                        print(f"Current model: {self.ollama.model}")
+                    from src.providers.ollama_model import OllamaModel
+                    if isinstance(self.ai_engine.analysis_provider, OllamaModel):
+                        models = self.ai_engine.analysis_provider.get_available_models()
+                        if models:
+                            print(f"Available models: {', '.join(models)}")
+                            print(f"Current model: {self.ai_engine.analysis_provider.model}")
+                        else:
+                            print("No models available. Make sure Ollama is running.")
                     else:
-                        print("No models available. Make sure Ollama is running.")
+                        print(f"Model listing not supported for provider: {self.config_manager.config.analysis_provider}")
                     return True
                 elif arg.startswith('model='):
                     model_name = arg.split('=', 1)[1]
-                    if self.ollama.set_model(model_name):
-                        print(f"Switched to model: {model_name}")
-                        return True
+                    from src.providers.ollama_model import OllamaModel
+                    if isinstance(self.ai_engine.analysis_provider, OllamaModel):
+                        if self.ai_engine.analysis_provider.set_model(model_name):
+                            print(f"Switched to model: {model_name}")
+                            return True
+                        else:
+                            print(f"Failed to switch to model: {model_name}")
+                            return False
                     else:
-                        print(f"Failed to switch to model: {model_name}")
+                        print("Model switching is only supported for the Ollama provider.")
                         return False
                 elif arg.startswith('animation='):
                     anim_type = arg.split('=', 1)[1]
@@ -499,7 +501,7 @@ class FancyGit:
                     if error_data:
                         # Start loading animation during AI analysis
                         with LoadingContext(animation_type=self.config_manager.config.loading_animation):
-                            ai_analysis = self.ollama.analyze_error_messages(error_data)
+                            ai_analysis = self.ai_engine.analyze_error_messages(error_data)
                         
                         if ai_analysis:
                             print("\n🧠 AI Analysis & Suggestions:")

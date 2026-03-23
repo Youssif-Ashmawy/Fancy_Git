@@ -1,11 +1,11 @@
 from pathlib import Path
 from src.fancygit_config_dc import FancyGitConfig
-
+from typing import Optional
 class ConfigManager():
 
     CONFIG_PATH = Path.home() / '.fancygit_config'
 
-    def __init__(self, config_path: Path = None):
+    def __init__(self, config_path: Optional[Path] = None):
         self.CONFIG_PATH = config_path or self.CONFIG_PATH
         self.config = FancyGitConfig()
         self.load_config()
