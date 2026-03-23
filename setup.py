@@ -15,7 +15,10 @@ class CustomBuildPy(_build_py):
             shutil.copy('.fancygit_config', os.path.join(build_lib, '.fancygit_config'))
             # Copy images folder for logo files
             if os.path.exists('images'):
-                shutil.copytree('images', os.path.join(build_lib, 'images'))
+                images_build_dir = os.path.join(build_lib, 'images')
+                if os.path.exists(images_build_dir):
+                    shutil.rmtree(images_build_dir)
+                shutil.copytree('images', images_build_dir)
 
 import os
 
@@ -67,6 +70,18 @@ setup(
     packages=find_packages(),
     py_modules=["fancygit", "welcome"],
     include_package_data=True,
+    package_data={
+        '': ['images/*.png', 'images/*.jpg', 'images/*.jpeg', 'images/*.gif'],
+    },
+    data_files=[
+        ('share/fancygit/images', [
+            'images/Logo.png',
+            'images/Logo_with_name.png', 
+            'images/dark_background_logo.png',
+            'images/light_background_logo.png',
+            'images/overview.png'
+        ]),
+    ],
     cmdclass={'build_py': CustomBuildPy},
     classifiers=[
         "Development Status :: 4 - Beta",

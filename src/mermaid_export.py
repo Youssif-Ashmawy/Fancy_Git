@@ -3,11 +3,90 @@ import os
 import re
 import textwrap
 from datetime import datetime
+try:
+    import importlib.resources as resources
+except ImportError:
+    import importlib_resources as resources
 
 
 class MermaidExporter:
     def __init__(self, runner):
         self.runner = runner
+        self._image_base_path = self._get_image_base_path()
+
+    def _get_image_base_path(self) -> str:
+        """Get the base path for images, handling both development and installed environments"""
+        # Try to get the path from installed package data first
+        try:
+            # When installed, try to find images in the package
+            if resources.is_resource('fancygit', 'images'):
+                return resources.files('fancygit').joinpath('images')
+        except Exception:
+            pass
+        
+        # Fallback to development environment - look relative to this file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        images_path = os.path.join(project_root, 'images')
+        
+        if os.path.exists(images_path):
+            return images_path
+        
+        # Final fallback - assume images are in the same directory as the HTML
+        return '.'
+
+    def _get_image_url(self, image_name: str) -> str:
+        """Get proper URL for image files"""
+        # First try to get the file as a resource (installed package)
+        try:
+            if resources.is_resource('fancygit', f'images/{image_name}'):
+                # For installed packages, we'll embed the image as base64
+                image_path = resources.files('fancygit').joinpath('images', image_name)
+                if hasattr(image_path, 'read_bytes'):
+                    # Python 3.9+ Path object
+                    return self._bytes_to_base64(image_path.read_bytes(), image_name)
+                elif os.path.exists(str(image_path)):
+                    return self._image_to_base64(str(image_path))
+        except Exception:
+            pass
+        
+        # In development, use absolute path
+        abs_path = os.path.join(self._image_base_path, image_name)
+        if os.path.exists(abs_path):
+            return self._image_to_base64(abs_path)
+        
+        # If not found, return empty string to avoid broken images
+        return ''
+
+    def _bytes_to_base64(self, image_bytes: bytes, image_name: str) -> str:
+        """Convert image bytes to base64 data URL"""
+        try:
+            import base64
+            encoded = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Determine MIME type
+            if image_name.lower().endswith('.png'):
+                mime_type = 'image/png'
+            elif image_name.lower().endswith(('.jpg', '.jpeg')):
+                mime_type = 'image/jpeg'
+            elif image_name.lower().endswith('.gif'):
+                mime_type = 'image/gif'
+            else:
+                mime_type = 'image/png'  # default
+            
+            return f'data:{mime_type};base64,{encoded}'
+        except Exception:
+            return ''
+
+    def _image_to_base64(self, image_path: str) -> str:
+        """Convert image file to base64 data URL"""
+        try:
+            with open(image_path, 'rb') as img_file:
+                image_bytes = img_file.read()
+                image_name = os.path.basename(image_path)
+                return self._bytes_to_base64(image_bytes, image_name)
+        except Exception:
+            return ''
 
     def _git(self, args):
         return self.runner.run_git_command(args)
@@ -456,6 +535,10 @@ class MermaidExporter:
     def build_html(self, diagrams: dict, title: str = 'FancyGit Repository Visualization') -> str:
         payload = json.dumps(diagrams)
         now = datetime.now().isoformat(timespec='seconds')
+        
+        # Get proper image URLs
+        light_logo_url = self._get_image_url('light_background_logo.png')
+        dark_logo_url = self._get_image_url('dark_background_logo.png')
 
         return textwrap.dedent(
             f"""\
@@ -551,7 +634,7 @@ class MermaidExporter:
                   .logo {{
                     width: 80px;
                     height: 80px;
-                    background-image: url('../images/light_background_logo.png');
+                    background-image: url('{light_logo_url}');
                     background-size: contain;
                     background-repeat: no-repeat;
                     background-position: center;
@@ -563,7 +646,7 @@ class MermaidExporter:
                   }}
                   
                   [data-theme="dark"] .logo {{
-                    background-image: url('../images/dark_background_logo.png');
+                    background-image: url('{dark_logo_url}');
                   }}
 
                   .meta {{

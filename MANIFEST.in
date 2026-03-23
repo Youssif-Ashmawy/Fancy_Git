@@ -7,5 +7,6 @@ include welcome.py
 include fancygit.py
 recursive-include src *.py
 recursive-include tests *.py
+recursive-include images *.png *.jpg *.jpeg *.gif
 global-exclude *.pyc
 global-exclude __pycache__
