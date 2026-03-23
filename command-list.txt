@@ -16,6 +16,7 @@ commit
 confirmation
 describe
 diff
+explain
 fetch
 format-patch
 gc
@@ -44,6 +45,7 @@ stash
 status
 submodule
 switch
+sync
 tag
 welcome
 worktree

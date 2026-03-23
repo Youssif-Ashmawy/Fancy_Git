@@ -12,10 +12,12 @@ try:
     from src.git_error import GitError
     from src.mermaid_export import MermaidExporter
     from src.git_insights import GitInsights
-    from src.ollama_client import OllamaClient
+    # from src.ollama_client import OllamaClient
+    from src.ai_engine import AIEngine
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
+    from src.config_manager import ConfigManager
     from welcome import show_welcome
 except ImportError:
     # When installed as a module, add the current directory to path
@@ -27,10 +29,12 @@ except ImportError:
     from src.git_error import GitError
     from src.mermaid_export import MermaidExporter
     from src.git_insights import GitInsights
-    from src.ollama_client import OllamaClient
+    # from src.ollama_client import OllamaClient
+    from src.ai_engine import AIEngine
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
+    from src.config_manager import ConfigManager
     from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -52,11 +56,12 @@ class FancyGit:
         Colors.check_color_support()
         
         # initialize required components
+        self.config_manager = ConfigManager()
         self.runner = GitRunner()
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
         self.insights = GitInsights(self.runner)
-        self.ollama = OllamaClient()
+        # self.ollama = OllamaClient()
         self.output_colorizer = OutputColorizer()
         self.available_commands = self._load_commands()
         self.confirmation_enabled = self._load_confirmation_state()
@@ -64,6 +69,8 @@ class FancyGit:
         self.output_coloring_enabled = self._load_output_coloring_state()
         self.loading_animation_type = self._load_animation_type()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
+        self.ai_engine = AIEngine(self.config_manager)
+        self.available_commands = self._load_commands()
     
     def _load_commands(self):
         """Dynamically load commands from command-list.txt file"""
@@ -94,6 +101,7 @@ class FancyGit:
         print(color_warning(f"Warning: {commands_file} not found. No commands available."))
         return []
     
+    ## Keep these functions for now
     def _load_confirmation_state(self):
         """Load confirmation state from config file"""
         config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
@@ -167,16 +175,16 @@ class FancyGit:
             bool: Current confirmation state
         """
         if enable is None:
-            self.confirmation_enabled = not self.confirmation_enabled
+            self.config_manager.config.confirmation_enabled = not self.config_manager.config.confirmation_enabled
         else:
-            self.confirmation_enabled = enable
+            self.config_manager.config.confirmation_enabled = enable
         
         # Save the state to file
-        self._save_confirmation_state()
+        self.config_manager.save_config()
         
-        status = "enabled" if self.confirmation_enabled else "disabled"
-        print(color_info(f"Confirmation messages {status}"))
-        return self.confirmation_enabled
+        status = "enabled" if self.config_manager.config.confirmation_enabled else "disabled"
+        print(f"Confirmation messages {status}")
+        return self.config_manager.config.confirmation_enabled
     
     def toggle_ai_analysis(self, enable=None):
         """Toggle AI analysis of error messages
@@ -189,25 +197,24 @@ class FancyGit:
             bool: Current AI analysis state
         """
         if enable is None:
-            self.ai_analysis_enabled = not self.ai_analysis_enabled
+            self.config_manager.config.ai_analysis_enabled = not self.config_manager.config.ai_analysis_enabled
         else:
-            self.ai_analysis_enabled = enable
+            self.config_manager.config.ai_analysis_enabled = enable
         
         # Save the state to file
-        self._save_confirmation_state()
+        self.config_manager.save_config()
         
-        status = "enabled" if self.ai_analysis_enabled else "disabled"
-        print(color_info(f"AI error analysis {status}"))
+        status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
+        print(f"AI error analysis {status}")
         
-        # Check Ollama connection when enabling
-        if self.ai_analysis_enabled and not self.ollama.test_connection():
-            print(color_warning("⚠️  Warning: Cannot connect to Ollama. Make sure Ollama is running on localhost:11434"))
-            print(color_warning("   Install Ollama from https://ollama.ai/ and run 'ollama serve'"))
-            self.ai_analysis_enabled = False
-            self._save_confirmation_state()
+        # Check AI provider connection when enabling
+        if self.config_manager.config.ai_analysis_enabled and not self.ai_engine.analysis_provider.test_connection():
+            print(color_warning("⚠️  Warning: Cannot connect to AI provider. Make sure it's running."))
+            self.config_manager.config.ai_analysis_enabled = False
+            self.config_manager.save_config()
             return False
         
-        return self.ai_analysis_enabled
+        return self.config_manager.config.ai_analysis_enabled
     
     def toggle_output_coloring(self, enable=None):
         """Toggle intelligent output coloring
@@ -242,14 +249,49 @@ class FancyGit:
         """
         valid_types = ['run', 'dots', 'progress', 'matrix', 'brain']
         if animation_type in valid_types:
-            self.loading_animation_type = animation_type
-            self._save_confirmation_state()
+            self.config_manager.config.loading_animation = animation_type
+            self.config_manager.save_config()
             print(color_info(f"Loading animation set to: {animation_type}"))
             return True
         else:
             print(color_error(f"Invalid animation type. Valid options: {', '.join(valid_types)}"))
             return False
     
+
+    def _get_remote_branches(self): 
+        # first get remote branches 
+        code, stdout, stderr = self.runner.run_git_command(['branch', '-r'])
+
+        branches = []
+        for line in stdout.splitlines():
+            line = line.strip()
+
+            if "->" in line:    # to ignore first line 
+                continue
+
+            branch = line.replace("origin/", "")    # to remove the origin thing
+            branches.append(branch)
+
+        return branches
+
+    def _get_local_branches(self):
+        code, stdout, stderr = self.runner.run_git_command(['branch'])
+        
+        branches = []
+        for line in stdout.splitlines():
+            line = line.strip()
+
+            branch = line.replace("*", "")  # to replace the marker for "current branch"
+            branches.append(branch)
+
+        return branches
+
+    def _get_new_branches(self):
+        remote_branches = self._get_remote_branches()
+        local_branches = self._get_local_branches()
+
+        return [new_branch for new_branch in remote_branches if new_branch not in local_branches]
+
     def execute_command(self, command, *args):
         """Unified dynamic command executor"""
         if command not in self.available_commands:
@@ -261,6 +303,76 @@ class FancyGit:
         if command == 'welcome':
             show_welcome()
             return True
+        
+        if command.startswith('explain'):
+            if not args:
+                print("Usage: fancygit explain <command>")
+                return True
+            
+            explain_command = args[0]
+            
+            print(f"\n Explanation for command: git {explain_command}")
+            print("-" * 40)
+            
+            with LoadingContext(animation_type=self.config_manager.config.loading_animation):
+                response = self.ai_engine.explain_command(explain_command)
+                
+            if response:
+                print(response)
+            else:
+                print("⚠️ Failed to get explanation from AI.")
+
+            return True
+
+        # Handle sync command which will 
+        # - check for new remote branches
+        # - get latest commits from remote
+        # - remove deleted remote branches and the local ones that refer to them
+        # - update current branch
+        # - create local branches for the new remote branches
+        # in just a single command "sync"
+        if command == "sync":
+            print("Fetching all branches and pruning deleted remote branches...")
+            code, stdout, stderr = self.runner.run_git_command(['fetch', '--all', '--prune'])
+            
+            if code == 0:
+                if stdout.strip() or stderr.strip():
+                    print(stdout.strip() if stdout.strip() else stderr.strip())
+                print("✅ Fetch completed successfully!")
+            else:
+                print("❌ Failed to fetch branches.")
+                print(stderr)
+
+            if '--all-branches' in args:
+                new_branches = self._get_new_branches() # fetch new branches
+                
+                if new_branches:
+                    print("\nNew remote branches detected:")
+                    
+                    for branch in new_branches:
+                        print("  origin/", branch)
+
+                    user_input = input("Create local branches to track these branches? (Y/n)").lower()
+
+                    if user_input == 'y':
+                        print("Creating local branches....")
+                        for branch in new_branches:
+                            self.runner.run_git_command(['checkout', '-b', branch, f"origin/{branch}"])     # ignore output for now cause well i cant find a use for it
+                        
+                        print("Done Creating local branches!!")
+                        return
+            elif '--ai-summary' in args:    # will implement a feature later that will changes smth like this
+                # Warning: Your local branch is 12 commits behind origin/main.
+                # Large pull detected.
+                # Would you like a summary of incoming changes? (AI)
+                # Incoming changes summary:
+                # • New authentication middleware
+                # • Refactor of merge parser
+                # • Bug fix in CLI command loader
+
+
+                None
+            return
         
         # Handle confirmation command specially
         if command == 'confirmation':
@@ -293,33 +405,47 @@ class FancyGit:
                 elif arg in ['toggle', 'switch']:
                     return self.toggle_ai_analysis()
                 elif arg in ['status', 'check']:
-                    status = "enabled" if self.ai_analysis_enabled else "disabled"
+                    status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
                     print(color_info(f"AI error analysis is {status}"))
-                    if self.ai_analysis_enabled:
-                        if self.ollama.test_connection():
-                            models = self.ollama.get_available_models()
-                            print(color_success(f"Using model: {self.ollama.model}"))
-                            if models:
-                                print(color_info(f"Available models: {', '.join(models[:5])}"))
+                    if self.config_manager.config.ai_analysis_enabled:
+                        if self.ai_engine.analysis_provider.test_connection():
+                            # get_available_models and model are Ollama-specific
+                            from src.providers.ollama_model import OllamaModel
+                            if isinstance(self.ai_engine.analysis_provider, OllamaModel):
+                                models = self.ai_engine.analysis_provider.get_available_models()
+                                print(color_success(f"Using model: {self.ai_engine.analysis_provider.model}"))
+                                if models:
+                                    print(color_info(f"Available models: {', '.join(models[:5])}"))
+                            else:
+                                print(color_info(f"Using provider: {self.config_manager.config.analysis_provider}"))
                         else:
-                            print(color_warning("⚠️  Ollama is not connected"))
-                    print(color_info(f"Loading animation: {self.loading_animation_type}"))
-                    return self.ai_analysis_enabled
+                            print("⚠️  AI provider is not connected")
+                    print(f"Loading animation: {self.config_manager.config.loading_animation}")
+                    return self.config_manager.config.ai_analysis_enabled
                 elif arg in ['models', 'list']:
-                    models = self.ollama.get_available_models()
-                    if models:
-                        print(color_info(f"Available Ollama models: {', '.join(models)}"))
-                        print(color_success(f"Current model: {self.ollama.model}"))
+                    from src.providers.ollama_model import OllamaModel
+                    if isinstance(self.ai_engine.analysis_provider, OllamaModel):
+                        models = self.ai_engine.analysis_provider.get_available_models()
+                        if models:
+                            print(color_info(f"Available models: {', '.join(models)}"))
+                            print(color_success(f"Current model: {self.ai_engine.analysis_provider.model}"))
+                        else:
+                            print(color_warning("No models available. Make sure Ollama is running."))
                     else:
-                        print(color_warning("No models available. Make sure Ollama is running."))
+                        print(color_warning(f"Model listing not supported for provider: {self.config_manager.config.analysis_provider}"))
                     return True
                 elif arg.startswith('model='):
                     model_name = arg.split('=', 1)[1]
-                    if self.ollama.set_model(model_name):
-                        print(color_success(f"Switched to model: {model_name}"))
-                        return True
+                    from src.providers.ollama_model import OllamaModel
+                    if isinstance(self.ai_engine.analysis_provider, OllamaModel):
+                        if self.ai_engine.analysis_provider.set_model(model_name):
+                            print(color_success(f"Switched to model: {model_name}"))
+                            return True
+                        else:
+                            print(color_error(f"Failed to switch to model: {model_name}"))
+                            return False
                     else:
-                        print(color_error(f"Failed to switch to model: {model_name}"))
+                        print(color_warning("Model switching is only supported for the Ollama provider."))
                         return False
                 elif arg.startswith('animation='):
                     anim_type = arg.split('=', 1)[1]
@@ -491,7 +617,7 @@ class FancyGit:
         print(color_command(f"Running: git {command} {' '.join(args)}"))
 
         # Show confirmation before executing the command
-        if self.confirmation_enabled:
+        if self.config_manager.config.confirmation_enabled:
             response = input(color_info(f"Execute 'git {command} {' '.join(args)}'? [y/N]: ")).strip().lower()
             if response != 'y':
                 print(color_warning("Command cancelled."))
@@ -532,8 +658,8 @@ class FancyGit:
                     print(message)
             
             # AI Analysis if enabled
-            if self.ai_analysis_enabled:
-                print(color_info("\n🤖 Analyzing with AI..."))
+            if self.config_manager.config.ai_analysis_enabled:
+                print(color_info("🤖 Analyzing with AI..."))
                 try:
                     # Convert GitError objects to dictionaries for analysis
                     error_data = []
@@ -550,8 +676,8 @@ class FancyGit:
                     
                     if error_data:
                         # Start loading animation during AI analysis
-                        with LoadingContext(animation_type=self.loading_animation_type):
-                            ai_analysis = self.ollama.analyze_error_messages(error_data)
+                        with LoadingContext(animation_type=self.config_manager.config.loading_animation):
+                            ai_analysis = self.ai_engine.analyze_error_messages(error_data)
                         
                         if ai_analysis:
                             print(color_ai("\n🧠 AI Analysis & Suggestions:"))

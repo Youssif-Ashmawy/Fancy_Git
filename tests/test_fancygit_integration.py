@@ -17,10 +17,7 @@ class TestFancyGitIntegration:
         """Setup method called before each test"""
         # Mock the config loading to avoid file dependencies
         with patch.object(FancyGit, '_load_commands', return_value=['add', 'commit', 'push', 'pull']):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=True):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_animation_type', return_value='simple'):
-                        self.fancy_git = FancyGit()
+            self.fancy_git = FancyGit()
     
     def test_fancygit_initialization(self):
         """Test FancyGit initializes with all required components"""
@@ -28,9 +25,9 @@ class TestFancyGitIntegration:
         assert hasattr(self.fancy_git, 'parser')
         assert hasattr(self.fancy_git, 'mermaid')
         assert hasattr(self.fancy_git, 'insights')
-        assert hasattr(self.fancy_git, 'ollama')
+        assert hasattr(self.fancy_git, 'ai_engine')
+        assert hasattr(self.fancy_git, 'config_manager')
         assert hasattr(self.fancy_git, 'available_commands')
-        assert hasattr(self.fancy_git, 'confirmation_enabled')
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_clean_git_status_workflow(self, mock_run_git):
@@ -133,14 +130,14 @@ class TestFancyGitIntegration:
         conflict_errors = [e for e in errors if 'conflict' in e.message.lower()]
         assert len(conflict_errors) == 6  # All errors contain "conflict"
     
-    @patch('src.ollama_client.OllamaClient.test_connection')
+    @patch('src.providers.ollama_model.OllamaModel.test_connection')
     def test_ai_integration_workflow(self, mock_test_connection):
         """Test AI integration workflow"""
         mock_test_connection.return_value = True
         
-        # Test Ollama client initialization and connection
-        if hasattr(self.fancy_git, 'ollama'):
-            connection_status = self.fancy_git.ollama.test_connection()
+        # Test AI engine initialization and connection
+        if hasattr(self.fancy_git, 'ai_engine'):
+            connection_status = self.fancy_git.ai_engine.analysis_provider.test_connection()
             assert connection_status is True
     
     def test_mermaid_export_integration(self):
@@ -152,7 +149,7 @@ class TestFancyGitIntegration:
     
     def test_configuration_loading(self):
         """Test that configuration is loaded properly"""
-        # Test that configuration values are set
-        assert isinstance(self.fancy_git.confirmation_enabled, bool)
-        assert isinstance(self.fancy_git.ai_analysis_enabled, bool)
-        assert isinstance(self.fancy_git.loading_animation_type, str)
+        # Test that configuration values are set through config_manager
+        assert isinstance(self.fancy_git.config_manager.config.confirmation_enabled, bool)
+        assert isinstance(self.fancy_git.config_manager.config.ai_analysis_enabled, bool)
+        assert isinstance(self.fancy_git.config_manager.config.loading_animation, str)
