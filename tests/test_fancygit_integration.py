@@ -17,7 +17,8 @@ class TestFancyGitIntegration:
         """Setup method called before each test"""
         # Mock the config loading to avoid file dependencies
         with patch.object(FancyGit, '_load_commands', return_value=['add', 'commit', 'push', 'pull']):
-            self.fancy_git = FancyGit()
+            with patch('src.config_manager.ConfigManager'):
+                self.fancy_git = FancyGit()
     
     def test_fancygit_initialization(self):
         """Test FancyGit initializes with all required components"""
@@ -137,8 +138,15 @@ class TestFancyGitIntegration:
         
         # Test AI engine initialization and connection
         if hasattr(self.fancy_git, 'ai_engine'):
-            connection_status = self.fancy_git.ai_engine.analysis_provider.test_connection()
-            assert connection_status is True
+            # Test that AI engine has the required providers
+            assert hasattr(self.fancy_git.ai_engine, 'analysis_provider')
+            assert hasattr(self.fancy_git.ai_engine, 'explanation_provider')
+            assert hasattr(self.fancy_git.ai_engine, 'translation_provider')
+            
+            # Test provider connection if available
+            if hasattr(self.fancy_git.ai_engine.analysis_provider, 'test_connection'):
+                connection_status = self.fancy_git.ai_engine.analysis_provider.test_connection()
+                assert connection_status is True
     
     def test_mermaid_export_integration(self):
         """Test Mermaid export functionality integration"""

@@ -11,6 +11,11 @@ tests/
 ├── test_git_error.py          # Unit tests for GitError dataclass
 ├── test_git_error_parser.py   # Unit tests for GitErrorParser
 ├── test_git_runner.py         # Unit tests for GitRunner
+├── test_ai_engine.py          # Unit tests for AI Engine
+├── test_config_manager.py     # Unit tests for Config Manager
+├── test_model_provider.py     # Unit tests for Model Provider factory
+├── test_providers.py          # Unit tests for AI providers (Ollama, OpenAI, Anthropic)
+├── test_ai_integration.py     # Integration tests for AI architecture
 ├── test_fancygit_integration.py # Integration tests for FancyGit
 ├── test_conflict_parser_integration.py # Conflict parser integration tests
 └── README.md                  # This file
@@ -22,11 +27,13 @@ tests/
 - Test individual components in isolation
 - Fast and focused
 - Use mocks to avoid external dependencies
+- **New AI Architecture Tests**: AI Engine, Config Manager, Model Provider, and AI providers
 
 ### Integration Tests (`@pytest.mark.integration`)
 - Test multiple components working together
 - Slower but more comprehensive
 - Test real workflows
+- **AI Integration Tests**: End-to-end AI architecture workflows
 
 ### Slow Tests (`@pytest.mark.slow`)
 - Tests that take significant time to run
@@ -98,13 +105,28 @@ def test_something(temp_git_repo):
     pass
 ```
 
-### `sample_git_outputs`
-Provides sample git command outputs:
+### `sample_ai_messages`
+Provides sample AI error messages for testing:
 ```python
-def test_parser(sample_git_outputs):
-    clean_output = sample_git_outputs["clean_output"]
-    error_output = sample_git_outputs["error_output"]
-    # ... test with sample data
+def test_ai_analysis(sample_ai_messages):
+    error_messages = sample_ai_messages
+    # ... test with sample AI messages
+```
+
+### `mock_config_manager`
+Provides a mock config manager for AI components:
+```python
+def test_ai_component(mock_config_manager):
+    config_manager = mock_config_manager
+    # ... test with mock configuration
+```
+
+### `temp_config_file`
+Creates a temporary config file for testing:
+```python
+def test_config_persistence(temp_config_file):
+    config_path = temp_config_file
+    # ... test with temporary config file
 ```
 
 ## Writing New Tests
@@ -125,6 +147,31 @@ class TestClassToTest:
         
         # Assert
         assert result == expected_value
+```
+
+### AI Architecture Unit Test Example
+```python
+import pytest
+from unittest.mock import patch, MagicMock
+from src.ai_engine import AIEngine
+
+@pytest.mark.unit
+class TestAIEngine:
+    def test_analyze_error_messages(self, mock_config_manager, sample_ai_messages):
+        # Arrange
+        with patch('src.model_provider.ModelProvider.get_model') as mock_get_model:
+            mock_provider = MagicMock()
+            mock_provider._call_model.return_value = "Analysis result"
+            mock_get_model.return_value = mock_provider
+            
+            ai_engine = AIEngine(mock_config_manager)
+        
+        # Act
+        result = ai_engine.analyze_error_messages(sample_ai_messages)
+        
+        # Assert
+        assert result == "Analysis result"
+        mock_provider._call_model.assert_called_once()
 ```
 
 ### Integration Test Example

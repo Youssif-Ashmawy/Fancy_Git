@@ -59,3 +59,86 @@ def sample_git_outputs():
             "stderr": ""
         }
     }
+
+@pytest.fixture
+def mock_config_manager():
+    """Mock config manager for testing AI components"""
+    from unittest.mock import MagicMock
+    from src.config_manager import ConfigManager
+    
+    mock_config = MagicMock()
+    mock_config.analysis_provider = "ollama"
+    mock_config.explanation_provider = "ollama"
+    mock_config.translation_provider = "ollama"
+    mock_config.ai_analysis_enabled = True
+    mock_config.loading_animation = "dots"
+    mock_config.ollama_host = "http://localhost:11434"
+    mock_config.ollama_model = "llama2"
+    mock_config.ollama_timeout = 30
+    mock_config.ollama_max_retries = 3
+    mock_config.openai_api_key = "test-key"
+    mock_config.openai_model = "gpt-3.5-turbo"
+    mock_config.openai_timeout = 30
+    mock_config.anthropic_api_key = "test-key"
+    mock_config.anthropic_model = "claude-3-sonnet-20240229"
+    mock_config.anthropic_timeout = 30
+    
+    mock_cm = MagicMock(spec=ConfigManager)
+    mock_cm.config = mock_config
+    return mock_cm
+
+@pytest.fixture
+def sample_ai_messages():
+    """Sample AI messages for testing error analysis"""
+    return [
+        {
+            "severity": "error",
+            "message": "fatal: not a git repository",
+            "type": "NOT_GIT_REPO",
+            "file": None,
+            "line": None
+        },
+        {
+            "severity": "warning", 
+            "message": "warning: LF will be replaced by CRLF",
+            "type": "LINE_ENDING",
+            "file": "test.py",
+            "line": None
+        },
+        {
+            "severity": "error",
+            "message": "error: merge conflict in README.md",
+            "type": "MERGE_CONFLICT",
+            "file": "README.md",
+            "line": 42
+        }
+    ]
+
+@pytest.fixture
+def temp_config_file():
+    """Create a temporary config file for testing"""
+    import tempfile
+    import os
+    from pathlib import Path
+    
+    temp_dir = tempfile.mkdtemp(prefix="fancygit_config_test_")
+    config_path = Path(temp_dir) / ".fancygit_config"
+    
+    # Write sample config
+    config_content = """analysis_provider=ollama
+explanation_provider=openai
+translation_provider=anthropic
+ai_analysis_enabled=true
+loading_animation=spinner
+ollama_max_retries=5
+ollama_host=http://localhost:11434
+ollama_model=llama2
+"""
+    with open(config_path, 'w') as f:
+        f.write(config_content)
+    
+    yield config_path
+    
+    # Cleanup
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
