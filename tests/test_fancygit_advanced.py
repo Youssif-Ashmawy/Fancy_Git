@@ -275,11 +275,10 @@ class TestFancyGitCommandEdgeCases:
     def setup_method(self):
         """Setup method called before each test"""
         with patch.object(FancyGit, '_load_commands', return_value=['add', 'commit', 'push', 'pull', 'status', 'log', 'show']):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
-                            self.fancy_git = FancyGit()
+            self.fancy_git = FancyGit()
+            # Disable confirmation directly on config to avoid stdin issues
+            self.fancy_git.config_manager.config.confirmation_enabled = False
+            self.fancy_git.config_manager.config.output_coloring_enabled = False
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_command_with_large_output(self, mock_run_git):
@@ -430,11 +429,10 @@ class TestFancyGitCommandPerformance:
     def setup_method(self):
         """Setup method called before each test"""
         with patch.object(FancyGit, '_load_commands', return_value=['add', 'commit', 'push', 'pull', 'status', 'log', 'branch', 'diff']):
-            with patch.object(FancyGit, '_load_confirmation_state', return_value=False):
-                with patch.object(FancyGit, '_load_ai_analysis_state', return_value=False):
-                    with patch.object(FancyGit, '_load_output_coloring_state', return_value=False):
-                        with patch.object(FancyGit, '_load_animation_type', return_value='dots'):
-                            self.fancy_git = FancyGit()
+            self.fancy_git = FancyGit()
+            # Disable confirmation directly on config to avoid stdin issues
+            self.fancy_git.config_manager.config.confirmation_enabled = False
+            self.fancy_git.config_manager.config.output_coloring_enabled = False
     
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_rapid_command_execution(self, mock_run_git):

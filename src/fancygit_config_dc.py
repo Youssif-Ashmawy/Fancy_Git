@@ -4,6 +4,7 @@ from dataclasses import dataclass
 class FancyGitConfig:
     confirmation_enabled: bool = True
     ai_analysis_enabled: bool = True
+    output_coloring_enabled: bool = True
     loading_animation: str = "run"
     
     max_visualization_commits: int = 40
