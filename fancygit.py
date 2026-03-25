@@ -367,6 +367,10 @@ class FancyGit:
             else:
                 return self.toggle_output_coloring()
 
+        # Handle complete-push command
+        if command == 'complete-push':
+            return self.complete_push(*args)
+
         # Handle insights command
         if command == 'insights':
             days = 30  # default
@@ -778,6 +782,256 @@ class FancyGit:
                 conflicts.append(error)
         
         return conflicts
+
+    def complete_push(self, *args):
+        """Complete push command that pulls changes, stages files, commits, and pushes
+        
+        Usage: complete-push [files...] [--all] [--message="commit message"] [--no-pull] [--no-push]
+        
+        Args:
+            files: Specific files to stage (optional)
+            --all: Stage all changes (default if no files specified)
+            --message: Custom commit message (if not provided, will prompt interactively)
+            --no-pull: Skip pulling changes before committing
+            --no-push: Skip pushing after committing
+        """
+        # Parse arguments
+        files_to_stage = []
+        commit_message = None
+        pull_changes = True
+        push_changes = True
+        
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg == '--all':
+                files_to_stage = ['.']  # Stage all changes
+            elif arg.startswith('--message='):
+                commit_message = arg.split('=', 1)[1]
+            elif arg == '--no-pull':
+                pull_changes = False
+            elif arg == '--no-push':
+                push_changes = False
+            elif arg == '--help':
+                print(color_header("Complete Push Command"))
+                print(color_info("Usage: complete-push [files...] [--all] [--message=\"commit message\"] [--no-pull] [--no-push]"))
+                print("")
+                print(color_info("Options:"))
+                print("  files...       : Specific files to stage")
+                print("  --all          : Stage all changes (default if no files specified)")
+                print("  --message=... : Custom commit message")
+                print("  --no-pull      : Skip pulling changes before committing")
+                print("  --no-push      : Skip pushing after committing")
+                print("  --help         : Show this help")
+                print("")
+                print(color_info("Examples:"))
+                print("  complete-push                           # Interactive mode with all changes")
+                print("  complete-push file1.py file2.py         # Stage specific files")
+                print("  complete-push --all --message=\"Fix bug\" # Stage all with custom message")
+                print("  complete-push --no-pull                 # Skip pulling changes")
+                return True
+            elif not arg.startswith('--'):
+                files_to_stage.append(arg)
+            i += 1
+        
+        # If no files specified, default to all changes
+        if not files_to_stage:
+            files_to_stage = ['.']
+        
+        print(color_header("🚀 Complete Push Workflow"))
+        print(Colors.divider("=", 40))
+        
+        # Step 0: Branch selection
+        print(color_info("🌿 Checking current branch..."))
+        repo_state = self.get_repo_state()
+        current_branch = repo_state.get('branch', 'unknown')
+        
+        print(color_info(f"Current branch: {color_branch(current_branch)}"))
+        change_branch = input(color_info("Change branch? [Press Enter to keep current, or enter branch name]: ")).strip()
+        
+        if change_branch:
+            # Switch to specified branch
+            print(color_info(f"🔄 Switching to branch: {color_branch(change_branch)}"))
+            returncode, stdout, stderr = self.runner.run_git_command(['checkout', change_branch])
+            if returncode == 0:
+                print(color_success(f"✅ Switched to branch: {change_branch}"))
+                current_branch = change_branch
+            else:
+                print(color_error(f"❌ Failed to switch to branch: {change_branch}"))
+                if stderr:
+                    print(stderr.strip())
+                return False
+        else:
+            print(color_success(f"✅ Staying on branch: {color_branch(current_branch)}"))
+        
+        # Step 0.5: Determine files to stage (show in dry run)
+        # Check if specific files were provided in command line arguments
+        specific_files_provided = any(arg and not arg.startswith('--') for arg in args)
+        
+        # If no specific files provided, show interactive file selection in dry run
+        if not specific_files_provided:
+            print(color_info("📋 Checking repository status..."))
+            repo_state = self.get_repo_state()
+            
+            # Collect all available files
+            available_files = []
+            if repo_state['staged']:
+                available_files.extend([('staged', f) for f in repo_state['staged']])
+            if repo_state['modified']:
+                available_files.extend([('modified', f) for f in repo_state['modified']])
+            if repo_state['untracked']:
+                available_files.extend([('untracked', f) for f in repo_state['untracked']])
+            
+            if available_files:
+                print(color_header("\n📁 Available files to stage:"))
+                for idx, (status, file_path) in enumerate(available_files, 1):
+                    status_icon = {
+                        'staged': '✅',
+                        'modified': '📝', 
+                        'untracked': '❓'
+                    }.get(status, '📄')
+                    print(f"  {idx:2d}. {status_icon} {color_file(file_path)} ({status})")
+                
+                print(color_info("\nSelect files to stage (Press Enter for all files, or enter numbers like 1,3,5 or 1-5 or 'staged' or 'modified' or 'untracked'):"))
+                selection = input(color_info("Your choice: ")).strip()
+                
+                selected_files = []
+                # Default to all files if empty input
+                if not selection:
+                    selected_files = [f for _, f in available_files]
+                    print(color_success("✅ Selected all files"))
+                elif selection == 'all':
+                    selected_files = [f for _, f in available_files]
+                elif selection in ['staged', 'modified', 'untracked']:
+                    selected_files = [f for status, f in available_files if status == selection]
+                else:
+                    # Parse comma-separated numbers and ranges
+                    try:
+                        indices = []
+                        for part in selection.split(','):
+                            part = part.strip()
+                            if '-' in part:
+                                start, end = map(int, part.split('-'))
+                                indices.extend(range(start, end + 1))
+                            else:
+                                indices.append(int(part))
+                        
+                        for idx in indices:
+                            if 1 <= idx <= len(available_files):
+                                selected_files.append(available_files[idx - 1][1])
+                            else:
+                                print(color_warning(f"Invalid index: {idx}"))
+                    except ValueError:
+                        print(color_error("Invalid selection format"))
+                        return False
+                
+                files_to_stage = selected_files if selected_files else ['.']
+            else:
+                print(color_warning("No changes to stage"))
+                return False
+        
+        # Step 1: Get commit message for dry run
+        while True:
+            print(color_info("\n📝 Enter commit message:"))
+            commit_message = input(color_info("Commit message: ")).strip()
+            
+            if commit_message:
+                break
+            else:
+                print(color_warning("⚠️  Commit message cannot be empty. Please try again."))
+        
+        # Step 2: Dry Run - Show planned operations
+        print(color_header("\n🔍 DRY RUN - Planned Operations"))
+        print(Colors.divider("-", 50))
+        
+        print(color_info(f"🌿 Branch: {color_branch(current_branch)}"))
+        if pull_changes:
+            print(color_info("📥 Pull: git pull"))
+        else:
+            print(color_info("⏭️  Pull: SKIPPED"))
+        
+        if files_to_stage:
+            print(color_info(f"📦 Stage: git add {' '.join(files_to_stage)}"))
+        else:
+            print(color_info("📦 Stage: No files to stage"))
+        
+        print(color_info(f"💾 Commit: git commit -m '{commit_message}'"))
+        
+        if push_changes:
+            print(color_info("📤 Push: git push"))
+        else:
+            print(color_info("⏭️  Push: SKIPPED"))
+        
+        print(Colors.divider("-", 50))
+        
+        # Step 3: Confirmation
+        print(color_info("\n❓ Do you want to execute these operations?"))
+        confirmation = input(color_info("[y/N]: ")).strip().lower()
+        
+        if confirmation not in ['y', 'yes']:
+            print(color_warning("❌ Operation cancelled by user"))
+            return False
+        
+        print(color_success("✅ Confirmed! Executing operations..."))
+        print(Colors.divider("=", 40))
+        
+        # Step 4: Pull changes if enabled
+        if pull_changes:
+            print(color_info("📥 Pulling latest changes..."))
+            returncode, stdout, stderr = self.runner.run_git_command(['pull'])
+            if returncode == 0:
+                print(color_success("✅ Pull completed successfully"))
+                if stdout:
+                    print(stdout.strip())
+            else:
+                print(color_warning("⚠️  Pull had issues, but continuing..."))
+                if stderr:
+                    print(stderr.strip())
+        else:
+            print(color_info("⏭️  Skipping pull changes"))
+        
+        # Step 5: Stage files
+        print(color_info(f"\n📦 Staging files: {', '.join(files_to_stage)}"))
+        returncode, stdout, stderr = self.runner.run_git_command(['add'] + files_to_stage)
+        if returncode == 0:
+            print(color_success("✅ Files staged successfully"))
+        else:
+            print(color_error("❌ Failed to stage files"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        # Step 6: Commit changes
+        print(color_info(f"\n💾 Committing with message: '{commit_message}'"))
+        returncode, stdout, stderr = self.runner.run_git_command(['commit', '-m', commit_message])
+        if returncode == 0:
+            print(color_success("✅ Changes committed successfully"))
+            if stdout:
+                print(stdout.strip())
+        else:
+            print(color_error("❌ Failed to commit changes"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        # Step 7: Push changes if enabled
+        if push_changes:
+            print(color_info("\n📤 Pushing changes..."))
+            returncode, stdout, stderr = self.runner.run_git_command(['push'])
+            if returncode == 0:
+                print(color_success("✅ Changes pushed successfully"))
+                if stdout:
+                    print(stdout.strip())
+            else:
+                print(color_warning("⚠️  Push had issues"))
+                if stderr:
+                    print(stderr.strip())
+        else:
+            print(color_info("⏭️  Skipping push"))
+        
+        print(Colors.divider("=", 40))
+        print(color_success("🎉 Complete push workflow completed!"))
+        return True
 
 
 def main():

@@ -13,6 +13,7 @@ clean
 clone
 colors
 commit
+complete-push
 confirmation
 describe
 diff
@@ -39,6 +40,7 @@ revert
 rm
 shortlog
 show
+complete-push
 sparse-checkout
 stash
 status
