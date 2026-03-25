@@ -70,6 +70,18 @@ class AIEngine:
                 ollama_provider.set_model(previous_model)
             raise e
 
+    def classify_command(self, command: str) -> str:
+        """
+        Classify the risk level of a git command using the configured analysis provider.
+        """
+        prompt = self._build_classify_prompt(command)
+        
+        try:
+            response = self.analysis_provider._call_model(prompt)
+            return response.strip() if response else "Unknown"
+        except Exception as e:
+            return f"Failed to classify command: {str(e)}"
+
     def _build_analysis_prompt(self, messages: List[Dict]) -> str:
         """Build the analysis prompt for the AI model"""
         prompt = """You are a Git expert assistant. Analyze the following Git error/warning messages and provide:
@@ -110,3 +122,49 @@ class AIEngine:
 
         [1-2 common flags and what they do]
         """
+
+    def _build_classify_prompt(self, command: str) -> str:
+        """Builds a prompt to classify the risk level of a git command."""
+        return f"""
+            You are a Git command risk classifier used in a developer tool.
+            Your job is to classify a Git command into ONE of the following risk levels:
+
+            Safe
+            Warning
+            Dangerous
+
+            Definitions:
+            - Safe → Read-only commands that do NOT modify files, commits, branches, or history
+            - Warning → Commands that modify repository state but are generally reversible or low-risk
+            - Dangerous → Commands that can delete data, overwrite commits, rewrite history, or cause irreversible changes
+
+            Strict Rules:
+            - Output ONLY one word: Safe, Warning, or Dangerous
+            - Do NOT explain your answer
+            - Do NOT include any extra text
+            - Do NOT output anything else
+
+            Important Heuristics:
+            - Commands that include flags like --force, --hard, -f, -d, -D, -x are usually Dangerous
+            - Commands that rewrite history (rebase, reset, commit --amend) are Dangerous
+            - Commands that delete files, branches, or untracked content are Dangerous
+            - Commands that modify files or commits but are reversible are Warning
+            - Commands that only view data (log, status, diff, show) are Safe
+
+            Examples:
+            git status → Safe
+            git log --oneline → Safe
+            git diff HEAD~1 → Safe
+
+            git add . → Warning
+            git commit -m "msg" → Warning
+            git pull origin main → Warning
+
+            git push --force → Dangerous
+            git reset --hard HEAD~1 → Dangerous
+            git clean -fdx → Dangerous
+            git branch -D feature → Dangerous
+
+            Now classify this command:
+
+            {command}"""
