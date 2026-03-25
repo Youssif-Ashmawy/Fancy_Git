@@ -106,6 +106,37 @@ fancygit insights [--days=N] [--format=console|json] [--output=filename]
 fancygit visualize [directory] [--max-commits=N] [--no-open]
 ```
 
+#### **🚀 Complete Push Workflow**
+```bash
+# Interactive complete push workflow (pull → stage → commit → push)
+fancygit complete-push
+
+# With specific files
+fancygit complete-push file1.py file2.py
+
+# Skip pull or push
+fancygit complete-push --no-pull --no-push
+
+# With custom commit message (still asks for confirmation)
+fancygit complete-push --message="Fix bug"
+```
+
+**Complete Push Features:**
+- **Branch Selection**: Shows current branch and allows switching before operations
+- **Interactive File Selection**: Displays available files with status (staged/modified/untracked)
+- **Smart Defaults**: Press Enter for all files, stay on current branch
+- **Dry Run Preview**: Shows all planned operations before execution
+- **User Confirmation**: Must confirm before any git operations run
+- **Continuous Commit Message Prompt**: Re-asks until non-empty message provided
+
+**Workflow Steps:**
+1. 🌿 Select/confirm branch
+2. 📋 Choose files to stage (interactive)
+3. 📝 Enter commit message (required)
+4. 🔍 Review dry run of all operations
+5. ❓ Confirm execution
+6. 🚀 Execute: pull → add → commit → push
+
 ### How It Works
 
 1. **Command Execution**: Runs the actual git command
