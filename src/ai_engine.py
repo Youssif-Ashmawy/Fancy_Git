@@ -82,6 +82,18 @@ class AIEngine:
         except Exception as e:
             return f"Failed to classify command: {str(e)}"
 
+    def confirmation_command(self, command: str, status, current_branch, recent_commits, command_risk_level: str) -> str:
+        """
+        Confirm if a git command is safe to run based on the current repo context and command risk level.
+        """
+        prompt = self._build_confirmation_prompt(command, status, current_branch, recent_commits, command_risk_level)
+        
+        try:
+            response = self.analysis_provider._call_model(prompt)
+            return response if response else "Unable to get confirmation."
+        except Exception as e:
+            return f"Failed to get confirmation: {str(e)}"
+
     def _build_analysis_prompt(self, messages: List[Dict]) -> str:
         """Build the analysis prompt for the AI model"""
         prompt = """You are a Git expert assistant. Analyze the following Git error/warning messages and provide:
@@ -168,3 +180,34 @@ class AIEngine:
             Now classify this command:
 
             {command}"""
+    
+    def _build_confirmation_prompt(self, command: str, status: str, current_branch: str, recent_commits: str, command_risk_level: str) -> str:
+        """Builds a prompt to confirm if a git command is safe to run."""
+        return f"""
+        You are an AI Git safety assistant. You are given the current state of a Git repository and a command the user wants to run.
+
+        Context:
+        - Repo Status (staged, unstaged, untracked files):
+        {status}
+        - Current Branch:
+        {current_branch}
+        - Recent Commits (last 3):
+        {recent_commits}
+        - Command Risk:
+        {command_risk_level}
+        - Command Issued:
+        {command}
+
+        Instructions:
+        1. Write a **confirmation message** in **3 sentences max** that:
+        - Explains exactly what will happen to this repo if the command is run, using the status, branch, and recent commits.
+        - If the command is DANGEROUS, clearly state **why it is dangerous**.
+        - Avoid vague generalizations — be specific about files, commits, and branch changes.
+
+        2. If the command is DANGEROUS, suggest **safer alternatives** in a separate section called `ALTERNATIVES:`. 
+        - If the command is not dangerous, **omit this section entirely**.
+
+        Output format (strict):
+        CONFIRMATION: <detailed explanation>
+        ALTERNATIVES: <safer commands if dangerous OR omit entirely>
+        """

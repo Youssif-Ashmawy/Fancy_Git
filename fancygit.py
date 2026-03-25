@@ -18,6 +18,7 @@ try:
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
     from src.config_manager import ConfigManager
+    from src.risk_analyzer import RiskAnalyzer
     from welcome import show_welcome
 except ImportError:
     # When installed as a module, add the current directory to path
@@ -35,6 +36,7 @@ except ImportError:
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
     from src.config_manager import ConfigManager
+    from src.risk_analyzer import RiskAnalyzer
     from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -66,6 +68,7 @@ class FancyGit:
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
         self.ai_engine = AIEngine(self.config_manager)
         self.available_commands = self._load_commands()
+        self.risk_analyzer = RiskAnalyzer()
         
     @property
     def confirmation_enabled(self):
@@ -122,7 +125,7 @@ class FancyGit:
         import sys
         if hasattr(sys, '_MEIPASS'):
             # PyInstaller
-            site_packages_dir = sys._MEIPASS
+            site_packages_dir = sys._MEIPASS    # type: ignore
         else:
             # Regular pip install - get the directory containing this module
             site_packages_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -343,7 +346,7 @@ class FancyGit:
                 # • Bug fix in CLI command loader
 
 
-                None
+                pass
             return
         
         # Handle confirmation command specially
@@ -582,11 +585,31 @@ class FancyGit:
                 return False
         
         return self._command_handler(command, *args)
- 
+    
+
+    # -------------------- NEW PRIVATE FUNCTIONS ------------------- #
+    def _gather_info_for_confirmation(self):
+        status = self.runner.run_git_command(['status', '--short'])
+        branch = self.runner.run_git_command(['branch', '--show-current'])
+        recent_commits = self.runner.run_git_command(['log', '-5', '--oneline'])
+        return status, branch, recent_commits
+    # -------------------- END OF NEW PRIVATE FUNCTIONS ------------------- #
+
+
     # REFACTORED
     def _command_handler(self, command, *args):     # private function
         """A Generic git commands handler"""
         print(color_command(f"Running: git {command} {' '.join(args)}"))
+
+        # ------------ NEW FEATURE: Confirmation before executing commands ------------
+        full_command = f"git {command} {' '.join(args)}"
+        risk_level = self.risk_analyzer.analyze(command_line=full_command, ai_engine=self.ai_engine)
+        status, branch, recent_commits = self._gather_info_for_confirmation()
+
+        confirmation_message = self.ai_engine.confirmation_command(command=full_command, command_risk_level=risk_level.value, status=status, current_branch=branch, recent_commits=recent_commits)
+        print(color_info(f"⚠️  Command Risk Level: {risk_level.name}"))
+        print(color_info(f"🤖 AI Confirmation Message:\n{confirmation_message}"))
+        # ----------------------------------------------------------------------------
 
         # Show confirmation before executing the command
         if self.config_manager.config.confirmation_enabled:

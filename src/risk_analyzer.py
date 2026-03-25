@@ -92,9 +92,8 @@ class RiskAnalyzer:
     
     def analyze(self, command_line, ai_engine):  # this will be the only interface between the user and this class, 
         # it will take the command line input and return the risk level
-
         
-        command_parts = command_line.split()[1:]  # get the whole command line and split it into parts, then ignore the first part which is "git"
+        command_parts = command_line.split()  # get the whole command line and split it into parts, then ignore the first part which is "git"
         base_command = command_parts[0] # the base command is the first part of the command line after "git"
 
         if not command_line:  # if there is no command after "git", return UNKNOWN
