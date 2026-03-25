@@ -4,6 +4,7 @@ import re
 import sys
 import os
 import webbrowser
+from prompt_toolkit import prompt
 
 # Handle both direct execution and module import
 try:
@@ -930,15 +931,91 @@ class FancyGit:
                 print(color_warning("No changes to stage"))
                 return False
         
-        # Step 1: Get commit message for dry run
-        while True:
-            print(color_info("\n📝 Enter commit message:"))
-            commit_message = input(color_info("Commit message: ")).strip()
+        # Step 1: Get commit message for dry run (with AI auto-suggestion)
+        print(color_info("\n📝 Generating AI commit message suggestion..."))
+        
+        # Generate AI suggestion automatically
+        ai_suggestion = None
+        try:
+            # Get repository state and staged changes for AI analysis
+            repo_state = self.get_repo_state()
             
-            if commit_message:
-                break
+            # Get diff of files that will be staged
+            diff_output = ""
+            if files_to_stage == ['.']:
+                # Get diff of all unstaged changes
+                returncode, diff_output, stderr = self.runner.run_git_command(['diff'])
+                if returncode != 0:
+                    diff_output = ""
             else:
-                print(color_warning("⚠️  Commit message cannot be empty. Please try again."))
+                # Get diff for specific files
+                for file_path in files_to_stage:
+                    returncode, file_diff, stderr = self.runner.run_git_command(['diff', file_path])
+                    if returncode == 0 and file_diff:
+                        diff_output += file_diff + "\n"
+            
+            if diff_output.strip():
+                # Prepare context for AI
+                context = {
+                    'branch': current_branch,
+                    'staged_files': files_to_stage if files_to_stage != ['.'] else ['all changes'],
+                    'diff': diff_output[:2000]  # Limit diff size for AI processing
+                }
+                
+                # Generate AI commit message
+                with LoadingContext(animation_type=self.loading_animation_type):
+                    ai_suggestion = self.ollama.generate_commit_message(context)
+                
+                if ai_suggestion:
+                    print(color_ai(f"💡 AI Suggestion: '{ai_suggestion}'"))
+                else:
+                    print(color_warning("⚠️  AI suggestion failed"))
+            else:
+                print(color_warning("⚠️  No changes found for AI analysis"))
+                
+        except Exception as e:
+            print(color_warning(f"⚠️  AI suggestion error: {e}"))
+        
+        # Now get user input with three options
+        while True:
+            if ai_suggestion:
+                print(color_info("\nChoose an option:"))
+                print(color_info("  1. Press Enter to use AI suggestion"))
+                print(color_info("  2. Type your own commit message"))
+                print(color_info("  3. Type 'm' to modify AI suggestion"))
+                
+                user_input = input(color_info("Your choice: ")).strip()
+                
+                if not user_input:
+                    # Option 1: Use AI suggestion
+                    commit_message = ai_suggestion
+                    print(color_success(f"✅ Using AI suggestion: '{commit_message}'"))
+                    break
+                elif user_input.lower() == 'm':
+                    # Option 3: Modify AI suggestion (like pressing up arrow)
+                    commit_message = prompt(
+                        "Modified commit message: ",
+                        default=ai_suggestion
+                    ).strip()
+                    
+                    if not commit_message:
+                        commit_message = ai_suggestion
+                        print(color_success(f"✅ Using original AI suggestion: '{commit_message}'"))
+                    else:
+                        print(color_success(f"✅ Using modified message: '{commit_message}'"))
+                    break
+                else:
+                    # Option 2: User's own message
+                    commit_message = user_input
+                    print(color_success(f"✅ Using custom message: '{commit_message}'"))
+                    break
+            else:
+                # No AI suggestion available, just ask for input
+                commit_message = input(color_info("📝 Enter commit message: ")).strip()
+                if commit_message:
+                    break
+                else:
+                    print(color_warning("⚠️  Commit message cannot be empty. Please try again."))
         
         # Step 2: Dry Run - Show planned operations
         print(color_header("\n🔍 DRY RUN - Planned Operations"))
@@ -955,7 +1032,7 @@ class FancyGit:
         else:
             print(color_info("📦 Stage: No files to stage"))
         
-        print(color_info(f"💾 Commit: git commit -m '{commit_message}'"))
+        print(color_info(f"💾 Commit: git commit -m \"{commit_message}\""))
         
         if push_changes:
             print(color_info("📤 Push: git push"))

@@ -119,15 +119,26 @@ fancygit complete-push --no-pull --no-push
 
 # With custom commit message (still asks for confirmation)
 fancygit complete-push --message="Fix bug"
+
+# With AI commit message suggestions (automatically generated, Press Enter to use)
+fancygit complete-push
 ```
 
 **Complete Push Features:**
 - **Branch Selection**: Shows current branch and allows switching before operations
 - **Interactive File Selection**: Displays available files with status (staged/modified/untracked)
 - **Smart Defaults**: Press Enter for all files, stay on current branch
+- **AI Commit Suggestions**: Automatically generated AI commit messages (Press Enter to use, requires Ollama)
 - **Dry Run Preview**: Shows all planned operations before execution
 - **User Confirmation**: Must confirm before any git operations run
 - **Continuous Commit Message Prompt**: Re-asks until non-empty message provided
+
+**AI Commit Message Features:**
+- **Context-Aware**: Analyzes git diff and repository state
+- **Conventional Commits**: Follows feat/fix/docs/style/refactor/test/chore format
+- **Smart Suggestions**: Based on actual changes being committed
+- **Optional**: Can accept or reject AI suggestions
+- **Fallback**: Works even if AI is unavailable
 
 **Workflow Steps:**
 1. 🌿 Select/confirm branch

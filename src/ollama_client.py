@@ -84,6 +84,71 @@ class OllamaClient:
         prompt += "\n\nAnalysis:"
         return prompt
     
+    def generate_commit_message(self, context: Dict) -> str:
+        """
+        Generate commit message based on git changes
+        
+        Args:
+            context: Dictionary containing branch, staged_files, and diff information
+            
+        Returns:
+            str: Suggested commit message
+        """
+        if not context:
+            return "feat: Add new functionality"
+        
+        # Build commit message prompt
+        prompt = self._build_commit_prompt(context)
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self._call_ollama(prompt)
+                if response:
+                    return response
+            except Exception as e:
+                if attempt == self.max_retries:
+                    return f"feat: Add changes to {context.get('branch', 'current')}"
+                time.sleep(1)  # Brief delay before retry
+        
+        return "feat: Update repository"
+    
+    def _build_commit_prompt(self, context: Dict) -> str:
+        """Build commit message generation prompt"""
+        prompt = """You are a Git expert. Generate a concise, conventional commit message based on the following changes:
+
+Repository Context:
+- Branch: {branch}
+- Files being committed: {files}
+
+Changes (git diff):
+{diff}
+
+Requirements:
+1. Use conventional commit format: type(scope): description
+2. Types: feat, fix, docs, style, refactor, test, chore
+3. Keep description under 50 characters
+4. Be specific about what changed
+5. Use imperative mood ("add" not "added")
+6. Focus on the "why" not just "what"
+7. **CRITICAL: Generate only ONE line - no multiple lines, no line breaks**
+
+Examples:
+- feat(auth): add OAuth2 login flow
+- fix(api): resolve null pointer in user service
+- docs(readme): update installation instructions
+- style(ui): fix button alignment
+- refactor(utils): simplify validation logic
+- test(user): add unit tests for registration
+- chore(deps): update dependencies
+
+Generate only the commit message, no explanation, no quotes, no backticks, no formatting - just the plain text:""".format(
+            branch=context.get('branch', 'main'),
+            files=', '.join(context.get('staged_files', ['files'])),
+            diff=context.get('diff', 'No diff available')[:1500]  # Limit for processing
+        )
+        
+        return prompt
+    
     def _call_ollama(self, prompt: str) -> Optional[str]:
         """Make API call to Ollama"""
         try:
@@ -106,7 +171,17 @@ class OllamaClient:
             
             if response.status_code == 200:
                 result = response.json()
-                return result.get('response', '').strip()
+                response_text = result.get('response', '').strip()
+                # Remove any surrounding quotes/backticks from AI response
+                if (response_text.startswith('"') and response_text.endswith('"')) or \
+                   (response_text.startswith("'") and response_text.endswith("'")) or \
+                   (response_text.startswith("`") and response_text.endswith("`")):
+                    response_text = response_text[1:-1].strip()
+                
+                # Ensure only first line is used (in case AI generates multiple lines)
+                response_text = response_text.split('\n')[0].strip()
+                
+                return response_text
             else:
                 raise Exception(f"Ollama API returned status {response.status_code}")
                 
