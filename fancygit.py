@@ -593,6 +593,16 @@ class FancyGit:
         branch = self.runner.run_git_command(['branch', '--show-current'])
         recent_commits = self.runner.run_git_command(['log', '-5', '--oneline'])
         return status, branch, recent_commits
+    
+    def _print_colored_risk_level(self, risk_level):
+        if risk_level == 'Safe':
+            print(color_success("Risk Level: SAFE"))
+        elif risk_level == 'Warning':
+            print(color_warning("Risk Level: WARNING"))
+        elif risk_level == 'Dangerous':
+            print(color_error("Risk Level: DANGEROUS"))
+        else:
+            print(color_info(f"Risk Level: {risk_level.upper()}"))
     # -------------------- END OF NEW PRIVATE FUNCTIONS ------------------- #
 
 
@@ -607,8 +617,8 @@ class FancyGit:
         status, branch, recent_commits = self._gather_info_for_confirmation()
 
         confirmation_message = self.ai_engine.confirmation_command(command=full_command, command_risk_level=risk_level.value, status=status, current_branch=branch, recent_commits=recent_commits)
-        print(color_info(f"⚠️  Command Risk Level: {risk_level.name}"))
-        print(color_info(f"🤖 AI Confirmation Message:\n{confirmation_message}"))
+        self._print_colored_risk_level(risk_level.value)
+        print(color_ai(f"🤖 AI Confirmation Message:\n{confirmation_message}"))
         # ----------------------------------------------------------------------------
 
         # Show confirmation before executing the command
