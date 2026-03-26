@@ -368,9 +368,9 @@ class FancyGit:
             else:
                 return self.toggle_output_coloring()
 
-        # Handle complete-push command
-        if command == 'complete-push':
-            return self.complete_push(*args)
+        # Handle ship command
+        if command == 'ship':
+            return self.ship(*args)
 
         # Handle insights command
         if command == 'insights':
@@ -784,10 +784,10 @@ class FancyGit:
         
         return conflicts
 
-    def complete_push(self, *args):
-        """Complete push command that pulls changes, stages files, commits, and pushes
+    def ship(self, *args):
+        """Ship command that pulls changes, stages files, commits, and pushes
         
-        Usage: complete-push [files...] [--all] [--message="commit message"] [--no-pull] [--no-push]
+        Usage: ship [files...] [--all] [--message="commit message"] [--no-pull] [--no-push]
         
         Args:
             files: Specific files to stage (optional)
@@ -814,8 +814,8 @@ class FancyGit:
             elif arg == '--no-push':
                 push_changes = False
             elif arg == '--help':
-                print(color_header("Complete Push Command"))
-                print(color_info("Usage: complete-push [files...] [--all] [--message=\"commit message\"] [--no-pull] [--no-push]"))
+                print(color_header("Ship Command"))
+                print(color_info("Usage: ship [files...] [--all] [--message=\"commit message\"] [--no-pull] [--no-push]"))
                 print("")
                 print(color_info("Options:"))
                 print("  files...       : Specific files to stage")
@@ -826,10 +826,10 @@ class FancyGit:
                 print("  --help         : Show this help")
                 print("")
                 print(color_info("Examples:"))
-                print("  complete-push                           # Interactive mode with all changes")
-                print("  complete-push file1.py file2.py         # Stage specific files")
-                print("  complete-push --all --message=\"Fix bug\" # Stage all with custom message")
-                print("  complete-push --no-pull                 # Skip pulling changes")
+                print("  ship                           # Interactive mode with all changes")
+                print("  ship file1.py file2.py         # Stage specific files")
+                print("  ship --all --message=\"Fix bug\" # Stage all with custom message")
+                print("  ship --no-pull                 # Skip pulling changes")
                 return True
             elif not arg.startswith('--'):
                 files_to_stage.append(arg)
@@ -839,7 +839,7 @@ class FancyGit:
         if not files_to_stage:
             files_to_stage = ['.']
         
-        print(color_header("🚀 Complete Push Workflow"))
+        print(color_header("🚀 Ship Workflow"))
         print(Colors.divider("=", 40))
         
         # Step 0: Branch selection
