@@ -1360,66 +1360,89 @@ class FancyGit:
         returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
         
         if returncode != 0:
-            # Check if this is a conflict due to local changes
-            if "would be overwritten by merge" in stderr or "Your local changes" in stderr:
-                print(color_warning("⚠️  Local changes conflict with redo operation"))
-                print(color_info("Choose an option:"))
-                print(color_info("  [Enter] Discard local changes and continue"))
-                print(color_info("  [s]     Stash changes, redo, then restore stash"))
-                print(color_info("  [c]     Cancel redo operation"))
+            # Check if this is a conflict due to local changes or merge conflicts
+            if ("would be overwritten by merge" in stderr or 
+                "Your local changes" in stderr or
+                "could not apply" in stderr or
+                "merge conflict" in stderr.lower() or
+                returncode == 1):  # git cherry-pick returns 1 for conflicts
+                print(color_warning("⚠️  Conflict detected during redo operation"))
                 
-                choice = input(color_info("Your choice: ")).strip().lower()
+                # First abort any in-progress cherry-pick to clean up
+                abort_returncode, abort_stdout, abort_stderr = self.runner.run_git_command(['cherry-pick', '--abort'])
                 
-                if choice == 'c':
-                    print(color_warning("❌ Redo operation cancelled"))
-                    return False
-                elif choice == 's':
-                    # Stash changes
-                    print(color_info("💾 Stashing local changes..."))
-                    stash_returncode, stash_stdout, stash_stderr = self.runner.run_git_command(['stash', 'push', '-m', 'Redo operation backup'])
-                    if stash_returncode != 0:
-                        print(color_error("❌ Failed to stash changes"))
-                        if stash_stderr:
-                            print(stash_stderr.strip())
-                        return False
-                    print(color_success("✅ Changes stashed"))
+                # Check if there are still local changes after abort
+                repo_state = self.get_repo_state()
+                has_changes = (repo_state['staged'] or repo_state['modified'] or repo_state['untracked'])
+                
+                if has_changes:
+                    print(color_info("Choose an option:"))
+                    print(color_info("  [Enter] Discard local changes and continue"))
+                    print(color_info("  [s]     Stash changes, redo, then restore stash"))
+                    print(color_info("  [c]     Cancel redo operation"))
                     
-                    # Try redo again
-                    print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
-                    returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                    choice = input(color_info("Your choice: ")).strip().lower()
                     
-                    if returncode == 0:
-                        print(color_success("✅ Successfully restored commit"))
-                        
-                        # Try to restore stash
-                        print(color_info("🔄 Restoring stashed changes..."))
-                        pop_returncode, pop_stdout, pop_stderr = self.runner.run_git_command(['stash', 'pop'])
-                        if pop_returncode == 0:
-                            print(color_success("✅ Stashed changes restored"))
-                        else:
-                            print(color_warning("⚠️  Could not restore stashed changes"))
-                            print(color_info("Run 'git stash pop' manually to restore"))
-                            if pop_stderr:
-                                print(pop_stderr.strip())
-                    else:
-                        print(color_error("❌ Failed to restore commit even after stashing"))
-                        if stderr:
-                            print(stderr.strip())
+                    if choice == 'c':
+                        print(color_warning("❌ Redo operation cancelled"))
                         return False
-                else:
-                    # Discard changes and retry
-                    print(color_info("🗑️  Discarding local changes..."))
-                    discard_returncode, discard_stdout, discard_stderr = self.runner.run_git_command(['reset', '--hard', 'HEAD'])
-                    if discard_returncode == 0:
-                        print(color_success("✅ Local changes discarded"))
+                    elif choice == 's':
+                        # Stash changes
+                        print(color_info("💾 Stashing local changes..."))
+                        stash_returncode, stash_stdout, stash_stderr = self.runner.run_git_command(['stash', 'push', '-m', 'Redo operation backup'])
+                        if stash_returncode != 0:
+                            print(color_error("❌ Failed to stash changes"))
+                            if stash_stderr:
+                                print(stash_stderr.strip())
+                            return False
+                        print(color_success("✅ Changes stashed"))
                         
                         # Try redo again
                         print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
                         returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                        
+                        if returncode == 0:
+                            print(color_success("✅ Successfully restored commit"))
+                            
+                            # Try to restore stash
+                            print(color_info("🔄 Restoring stashed changes..."))
+                            pop_returncode, pop_stdout, pop_stderr = self.runner.run_git_command(['stash', 'pop'])
+                            if pop_returncode == 0:
+                                print(color_success("✅ Stashed changes restored"))
+                            else:
+                                print(color_warning("⚠️  Could not restore stashed changes"))
+                                print(color_info("Run 'git stash pop' manually to restore"))
+                                if pop_stderr:
+                                    print(pop_stderr.strip())
+                        else:
+                            print(color_error("❌ Failed to restore commit even after stashing"))
+                            if stderr:
+                                print(stderr.strip())
+                            return False
                     else:
-                        print(color_error("❌ Failed to discard changes"))
-                        if discard_stderr:
-                            print(discard_stderr.strip())
+                        # Discard changes and retry
+                        print(color_info("🗑️  Discarding local changes..."))
+                        discard_returncode, discard_stdout, discard_stderr = self.runner.run_git_command(['reset', '--hard', 'HEAD'])
+                        if discard_returncode == 0:
+                            print(color_success("✅ Local changes discarded"))
+                            
+                            # Try redo again
+                            print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
+                            returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                        else:
+                            print(color_error("❌ Failed to discard changes"))
+                            if discard_stderr:
+                                print(discard_stderr.strip())
+                            return False
+                else:
+                    # No local changes after abort, just retry directly
+                    print(color_info("🔄 Retrying restore of commit..."))
+                    returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                    
+                    if returncode != 0:
+                        print(color_error("❌ Failed to restore commit"))
+                        if stderr:
+                            print(stderr.strip())
                         return False
         
         if returncode == 0:
