@@ -376,6 +376,10 @@ class FancyGit:
         if command == 'undo':
             return self.undo(*args)
 
+        # Handle redo command
+        if command == 'redo':
+            return self.redo(*args)
+
         # Handle insights command
         if command == 'insights':
             days = 30  # default
@@ -1243,6 +1247,159 @@ class FancyGit:
             print(color_error("❌ Failed to reset to previous commit"))
             if stderr:
                 print(stderr.strip())
+            return False
+
+    def redo(self, *args):
+        """Redo command that restores commits that were undone using the undo command
+        
+        Usage: redo [--help]
+        
+        This command uses git reflog to find and restore the most recent commit
+        that was moved away from by a reset operation.
+        """
+        # Parse arguments
+        show_help = False
+        
+        for arg in args:
+            if arg == '--help':
+                show_help = True
+        
+        if show_help:
+            print(color_header("Redo Command"))
+            print(color_info("Usage: redo"))
+            print("")
+            print(color_info("Options:"))
+            print("  --help   : Show this help")
+            print("")
+            print(color_info("Description:"))
+            print("  Restores the most recent commit that was undone using 'undo'")
+            print("  Uses git reflog to find and re-apply the reset commit")
+            print("")
+            print(color_info("Examples:"))
+            print("  redo           # Redo the last undo operation")
+            return True
+        
+        print(color_header("↪️  Redo Command"))
+        print(Colors.divider("=", 40))
+        
+        # Check if we're in a git repository
+        returncode, stdout, stderr = self.runner.run_git_command(['rev-parse', '--git-dir'])
+        if returncode != 0:
+            print(color_error("❌ Not in a git repository"))
+            return False
+        
+        # Get reflog to find the most recent reset operation
+        returncode, stdout, stderr = self.runner.run_git_command(['reflog', '--oneline', '-n', '10'])
+        if returncode != 0:
+            print(color_error("❌ Failed to get reflog"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        reflog_entries = stdout.strip().split('\n')
+        if not reflog_entries or not stdout.strip():
+            print(color_error("❌ No reflog entries found"))
+            return False
+        
+        # Find the most recent reset operation
+        reset_commit = None
+        for entry in reflog_entries:
+            if 'reset:' in entry or 'reset: moving' in entry:
+                # Extract the commit hash from the reflog entry
+                parts = entry.split()
+                if len(parts) >= 2:
+                    reset_commit = parts[0]  # The reflog reference
+                    break
+        
+        if not reset_commit:
+            print(color_warning("⚠️  No recent undo operation found in reflog"))
+            print(color_info("Use 'undo' first, then 'redo' to restore"))
+            return False
+        
+        # Get the commit that was reset to
+        returncode, stdout, stderr = self.runner.run_git_command(['reflog', 'show', '--format=%H', '-n', '1', reset_commit])
+        if returncode != 0:
+            print(color_error("❌ Failed to get commit details from reflog"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        target_commit = stdout.strip()
+        if not target_commit:
+            print(color_error("❌ Could not determine target commit"))
+            return False
+        
+        # Get current and target commit info for display
+        returncode, current_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+        returncode, target_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1', target_commit])
+        
+        print(color_info("Current state:"))
+        if current_stdout:
+            print(f"  HEAD: {color_info(current_stdout.strip())}")
+        
+        print(color_info("Will restore to:"))
+        if target_stdout:
+            print(f"  Commit: {color_success(target_stdout.strip())}")
+        
+        # Get repository state before redo for warning
+        repo_state = self.get_repo_state()
+        has_staged = bool(repo_state['staged'])
+        has_modified = bool(repo_state['modified'])
+        has_untracked = bool(repo_state['untracked'])
+        
+        if has_staged or has_modified or has_untracked:
+            print(color_warning("\n⚠️  WARNING: Redo will affect current working directory:"))
+            if has_staged:
+                print(f"  • Staged changes: {len(repo_state['staged'])} files")
+            if has_modified:
+                print(f"  • Modified files: {len(repo_state['modified'])} files")
+            if has_untracked:
+                print(f"  • Untracked files: {len(repo_state['untracked'])} files")
+        
+        # Confirmation
+        if self.confirmation_enabled:
+            response = input(color_info(f"\nRestore commit {target_commit[:8]}? [y/N]: ")).strip().lower()
+            if response not in ['y', 'yes']:
+                print(color_warning("❌ Redo operation cancelled"))
+                return False
+        
+        # Execute the redo using cherry-pick
+        print(color_info(f"\n🔄 Restoring commit {target_commit[:8]}..."))
+        returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+        
+        if returncode == 0:
+            print(color_success("✅ Successfully restored commit"))
+            
+            # Show new state
+            print(color_info("\n📋 New repository state:"))
+            returncode, new_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+            if returncode == 0:
+                print(f"  Current HEAD: {color_success(new_stdout.strip())}")
+            
+            # Show working directory status
+            new_repo_state = self.get_repo_state()
+            if new_repo_state['staged']:
+                print(f"  Staged files: {len(new_repo_state['staged'])}")
+            if new_repo_state['modified']:
+                print(f"  Modified files: {len(new_repo_state['modified'])}")
+            if new_repo_state['untracked']:
+                print(f"  Untracked files: {len(new_repo_state['untracked'])}")
+            
+            if new_repo_state['clean']:
+                print(color_success("  Working directory is clean"))
+            
+            return True
+        else:
+            print(color_error("❌ Failed to restore commit"))
+            if stderr:
+                print(stderr.strip())
+            
+            # Try to provide helpful error information
+            if "conflict" in stderr.lower():
+                print(color_info("💡 Tip: Resolve conflicts and run 'git cherry-pick --continue'"))
+            elif "empty" in stderr.lower():
+                print(color_info("💡 This commit might already be applied"))
+            
             return False
 
 

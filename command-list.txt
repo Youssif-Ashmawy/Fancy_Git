@@ -34,6 +34,7 @@ pull
 push
 range-diff
 rebase
+redo
 reset
 restore
 revert
@@ -49,6 +50,5 @@ switch
 tag
 welcome
 worktree
-unstage
 undo
 visualize
