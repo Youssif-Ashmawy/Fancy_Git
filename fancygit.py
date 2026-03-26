@@ -1333,6 +1333,15 @@ class FancyGit:
         if target_stdout:
             print(f"  Commit: {color_success(target_stdout.strip())}")
         
+        # Check if target commit is the same as current HEAD
+        current_head_hash = current_stdout.strip().split()[0] if current_stdout.strip() else None
+        target_commit_short = target_commit[:8] if target_commit else None
+        
+        if current_head_hash and target_commit_short and current_head_hash.startswith(target_commit_short):
+            print(color_info("✅ Target commit is already the current HEAD"))
+            print(color_info("No need to restore - already at the target commit"))
+            return True
+        
         # Get repository state before redo for warning
         repo_state = self.get_repo_state()
         has_staged = bool(repo_state['staged'])
