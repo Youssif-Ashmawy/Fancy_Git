@@ -1377,9 +1377,8 @@ class FancyGit:
                 
                 if has_changes:
                     print(color_info("Choose an option:"))
-                    print(color_info("  [Enter] Discard local changes and continue"))
+                    print(color_info("  [Enter] Hard reset to match remote, then redo (default)"))
                     print(color_info("  [s]     Stash changes, redo, then restore stash"))
-                    print(color_info("  [p]     Hard reset to match remote, then redo"))
                     print(color_info("  [c]     Cancel redo operation"))
                     
                     choice = input(color_info("Your choice: ")).strip().lower()
@@ -1387,40 +1386,9 @@ class FancyGit:
                     if choice == 'c':
                         print(color_warning("❌ Redo operation cancelled"))
                         return False
-                    elif choice == 'p':
-                        # Hard reset to match remote and pull
-                        print(color_info("🔄 Resetting to match remote branch..."))
-                        reset_returncode, reset_stdout, reset_stderr = self.runner.run_git_command(['reset', '--hard', 'origin/developer'])
-                        if reset_returncode == 0:
-                            print(color_success("✅ Reset to remote branch"))
-                            
-                            print(color_info("📥 Pulling latest changes..."))
-                            pull_returncode, pull_stdout, pull_stderr = self.runner.run_git_command(['pull'])
-                            if pull_returncode == 0:
-                                print(color_success("✅ Pulled latest changes"))
-                                
-                                # Try redo again
-                                print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
-                                returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
-                                
-                                if returncode != 0:
-                                    print(color_error("❌ Failed to restore commit after sync"))
-                                    if stderr:
-                                        print(stderr.strip())
-                                    return False
-                            else:
-                                print(color_error("❌ Failed to pull changes"))
-                                if pull_stderr:
-                                    print(pull_stderr.strip())
-                                return False
-                        else:
-                            print(color_error("❌ Failed to reset to remote"))
-                            if reset_stderr:
-                                print(reset_stderr.strip())
-                            return False
                     elif choice == 's':
                         # Stash changes
-                        print(color_info("💾 Stashing local changes..."))
+                        print(color_info("� Stashing local changes..."))
                         stash_returncode, stash_stdout, stash_stderr = self.runner.run_git_command(['stash', 'push', '-m', 'Redo operation backup'])
                         if stash_returncode != 0:
                             print(color_error("❌ Failed to stash changes"))
@@ -1452,19 +1420,42 @@ class FancyGit:
                                 print(stderr.strip())
                             return False
                     else:
-                        # Discard changes and retry
-                        print(color_info("🗑️  Discarding local changes..."))
-                        discard_returncode, discard_stdout, discard_stderr = self.runner.run_git_command(['reset', '--hard', 'HEAD'])
-                        if discard_returncode == 0:
-                            print(color_success("✅ Local changes discarded"))
+                        # Default: Hard reset to match remote and pull
+                        print(color_info("🔄 Resetting to match remote branch..."))
+                        reset_returncode, reset_stdout, reset_stderr = self.runner.run_git_command(['reset', '--hard', 'origin/developer'])
+                        if reset_returncode == 0:
+                            print(color_success("✅ Reset to remote branch"))
                             
-                            # Try redo again
-                            print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
-                            returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                            print(color_info("� Pulling latest changes..."))
+                            pull_returncode, pull_stdout, pull_stderr = self.runner.run_git_command(['pull'])
+                            if pull_returncode == 0:
+                                print(color_success("✅ Pulled latest changes"))
+                                
+                                # Check if the target commit is already in the history
+                                check_returncode, check_stdout, check_stderr = self.runner.run_git_command(['log', '--oneline', '-n', '10'])
+                                if check_returncode == 0 and target_commit[:8] in check_stdout:
+                                    print(color_success("✅ Target commit is already present in branch history"))
+                                    print(color_info("No need to restore - commit already exists"))
+                                    return True
+                                
+                                # Try redo again
+                                print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
+                                returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                                
+                                if returncode != 0:
+                                    print(color_error("❌ Failed to restore commit after sync"))
+                                    if stderr:
+                                        print(stderr.strip())
+                                    return False
+                            else:
+                                print(color_error("❌ Failed to pull changes"))
+                                if pull_stderr:
+                                    print(pull_stderr.strip())
+                                return False
                         else:
-                            print(color_error("❌ Failed to discard changes"))
-                            if discard_stderr:
-                                print(discard_stderr.strip())
+                            print(color_error("❌ Failed to reset to remote"))
+                            if reset_stderr:
+                                print(reset_stderr.strip())
                             return False
                 else:
                     # No local changes after abort, just retry directly
