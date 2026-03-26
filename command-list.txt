@@ -49,4 +49,6 @@ switch
 tag
 welcome
 worktree
+unstage
+undo
 visualize

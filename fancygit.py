@@ -372,6 +372,10 @@ class FancyGit:
         if command == 'ship':
             return self.ship(*args)
 
+        # Handle undo command
+        if command == 'undo':
+            return self.undo(*args)
+
         # Handle insights command
         if command == 'insights':
             days = 30  # default
@@ -1109,6 +1113,137 @@ class FancyGit:
         print(Colors.divider("=", 40))
         print(color_success("🎉 Complete push workflow completed!"))
         return True
+
+    def undo(self, *args):
+        """Undo command that reverts to the previous state before the latest commit
+        
+        Usage: undo [--soft] [--mixed] [--hard] [--help]
+        
+        Args:
+            --soft:   Keep changes staged (git reset --soft HEAD~1)
+            --mixed:  Unstage changes but keep them in working directory (git reset --mixed HEAD~1) - default
+            --hard:   Discard all changes (git reset --hard HEAD~1)
+            --help:   Show this help
+        """
+        # Parse arguments
+        reset_type = '--mixed'  # default
+        show_help = False
+        
+        for arg in args:
+            if arg in ['--soft', '--mixed', '--hard']:
+                reset_type = arg
+            elif arg == '--help':
+                show_help = True
+        
+        if show_help:
+            print(color_header("Undo Command"))
+            print(color_info("Usage: undo [--soft|--mixed|--hard]"))
+            print("")
+            print(color_info("Options:"))
+            print("  --soft   : Keep changes staged (reset --soft HEAD~1)")
+            print("  --mixed  : Unstage changes but keep them in working directory (reset --mixed HEAD~1) - default")
+            print("  --hard   : Discard all changes (reset --hard HEAD~1)")
+            print("  --help   : Show this help")
+            print("")
+            print(color_info("Examples:"))
+            print("  undo           # Reset with --mixed (default)")
+            print("  undo --soft    # Keep changes staged")
+            print("  undo --hard    # Discard all changes")
+            return True
+        
+        print(color_header("↩️  Undo Command"))
+        print(Colors.divider("=", 40))
+        
+        # Check if we're in a git repository
+        returncode, stdout, stderr = self.runner.run_git_command(['rev-parse', '--git-dir'])
+        if returncode != 0:
+            print(color_error("❌ Not in a git repository"))
+            return False
+        
+        # Get current commit info
+        returncode, stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '2'])
+        if returncode != 0:
+            print(color_error("❌ Failed to get commit history"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        commits = stdout.strip().split('\n')
+        if len(commits) < 2:
+            print(color_warning("⚠️  No previous commit to undo to"))
+            print(color_info("Current commit is the only commit in the repository"))
+            return False
+        
+        current_commit = commits[0]
+        previous_commit = commits[1]
+        
+        print(color_info("Current commit history:"))
+        print(f"  HEAD:     {color_success(current_commit)}")
+        print(f"  Previous: {color_info(previous_commit)}")
+        
+        # Show what will be reset based on reset type
+        reset_descriptions = {
+            '--soft': 'Keep changes staged',
+            '--mixed': 'Unstage changes but keep them in working directory',
+            '--hard': 'Discard all changes'
+        }
+        
+        print(color_info(f"\nReset type: {color_success(reset_type)}"))
+        print(color_info(f"Action: {reset_descriptions[reset_type]}"))
+        
+        # Get repository state before reset for warning
+        repo_state = self.get_repo_state()
+        has_staged = bool(repo_state['staged'])
+        has_modified = bool(repo_state['modified'])
+        has_untracked = bool(repo_state['untracked'])
+        
+        if reset_type == '--hard' and (has_staged or has_modified or has_untracked):
+            print(color_warning("\n⚠️  WARNING: --hard reset will discard:"))
+            if has_staged:
+                print(f"  • Staged changes: {len(repo_state['staged'])} files")
+            if has_modified:
+                print(f"  • Modified files: {len(repo_state['modified'])} files")
+            if has_untracked:
+                print(f"  • Untracked files: {len(repo_state['untracked'])} files")
+        
+        # Confirmation
+        if self.confirmation_enabled:
+            response = input(color_info(f"\nReset to previous commit with {reset_type}? [y/N]: ")).strip().lower()
+            if response not in ['y', 'yes']:
+                print(color_warning("❌ Undo operation cancelled"))
+                return False
+        
+        # Execute the reset
+        print(color_info(f"\n🔄 Resetting to previous commit ({reset_type})..."))
+        returncode, stdout, stderr = self.runner.run_git_command(['reset', reset_type, 'HEAD~1'])
+        
+        if returncode == 0:
+            print(color_success("✅ Successfully reset to previous commit"))
+            
+            # Show new state
+            print(color_info("\n📋 New repository state:"))
+            returncode, new_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+            if returncode == 0:
+                print(f"  Current HEAD: {color_success(new_stdout.strip())}")
+            
+            # Show working directory status
+            new_repo_state = self.get_repo_state()
+            if new_repo_state['staged']:
+                print(f"  Staged files: {len(new_repo_state['staged'])}")
+            if new_repo_state['modified']:
+                print(f"  Modified files: {len(new_repo_state['modified'])}")
+            if new_repo_state['untracked']:
+                print(f"  Untracked files: {len(new_repo_state['untracked'])}")
+            
+            if new_repo_state['clean']:
+                print(color_success("  Working directory is clean"))
+            
+            return True
+        else:
+            print(color_error("❌ Failed to reset to previous commit"))
+            if stderr:
+                print(stderr.strip())
+            return False
 
 
 def main():
