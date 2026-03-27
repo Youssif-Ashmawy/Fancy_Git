@@ -1329,13 +1329,6 @@ class FancyGit:
         if current_stdout:
             print(f"  HEAD: {color_info(current_stdout.strip())}")
         
-        # Check if target commit is already in the current branch history
-        returncode, history_stdout, history_stderr = self.runner.run_git_command(['log', '--oneline', '--all'])
-        if returncode == 0 and target_commit[:8] in history_stdout:
-            print(color_info("✅ Target commit is already in branch history"))
-            print(color_info("No need to restore - commit already exists in the repository"))
-            return True
-        
         print(color_info("Will restore to:"))
         if target_stdout:
             print(f"  Commit: {color_success(target_stdout.strip())}")
