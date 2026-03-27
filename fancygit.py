@@ -19,6 +19,7 @@ try:
     from src.output_colorizer import OutputColorizer
     from src.config_manager import ConfigManager
     from src.risk_analyzer import RiskAnalyzer
+    from src.utils import DRY_RUN_SUPPORT, get_dry_run
     from welcome import show_welcome
 except ImportError:
     # When installed as a module, add the current directory to path
@@ -37,6 +38,7 @@ except ImportError:
     from src.output_colorizer import OutputColorizer
     from src.config_manager import ConfigManager
     from src.risk_analyzer import RiskAnalyzer
+    from src.utils import DRY_RUN_SUPPORT, get_dry_run
     from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -593,7 +595,19 @@ class FancyGit:
         branch = self.runner.run_git_command(['branch', '--show-current'])
         recent_commits = self.runner.run_git_command(['log', '-5', '--oneline'])
         return status, branch, recent_commits
-    
+
+    def _dry_run_command(self, command, args):
+        full_command = f"git {command} {' '.join(args)}"
+        dry_run, dry_mode = get_dry_run(command, full_command)
+
+        if not dry_run:
+            return "Dry run not supported for this command", "NONE"
+
+        code, stdout, stderr = self.runner.run_git_command(dry_run)
+
+        output = (stdout or "") + (stderr or "")
+        return output.strip(), dry_mode
+
     def _print_colored_risk_level(self, risk_level):
         if risk_level == 'Safe':
             print(color_success("Risk Level: SAFE"))
@@ -615,10 +629,10 @@ class FancyGit:
         full_command = f"git {command} {' '.join(args)}"
         risk_level = self.risk_analyzer.analyze(command_line=full_command, ai_engine=self.ai_engine)
         status, branch, recent_commits = self._gather_info_for_confirmation()
-
-        confirmation_message = self.ai_engine.confirmation_command(command=full_command, command_risk_level=risk_level.value, status=status, current_branch=branch, recent_commits=recent_commits)
+        dry_output, dry_mode = self._dry_run_command(command, args)
+        confirmation_message = self.ai_engine.confirmation_command(command=full_command, status=status, current_branch=branch, recent_commits=recent_commits, command_risk_level=risk_level.value, dry_output=dry_output, dry_mode=dry_mode)
         self._print_colored_risk_level(risk_level.value)
-        print(color_ai(f"🤖 AI Confirmation Message:\n{confirmation_message}"))
+        print(color_ai(f"🤖 AI Confirmation Message:\n{self.ai_engine._post_process(confirmation_message, risk_level.value)}"))
         # ----------------------------------------------------------------------------
 
         # Show confirmation before executing the command
