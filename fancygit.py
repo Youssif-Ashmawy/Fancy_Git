@@ -1301,15 +1301,16 @@ class FancyGit:
             print(color_error("❌ No reflog entries found"))
             return False
         
-        # Find the most recent reset operation and get the commit that was moved away from
+        # Find the most recent reset operation and get the commit that was moved to (the newer commit)
         target_commit = None
         for i, entry in enumerate(reflog_entries):
             if 'reset: moving to HEAD~1' in entry:
-                # The commit that was reset is in the next reflog entry (the commit before the reset)
-                if i + 1 < len(reflog_entries):
-                    next_entry = reflog_entries[i + 1]
-                    # Extract commit hash from the next entry
-                    parts = next_entry.split()
+                # The commit that was reset FROM (the newer commit we want to redo to) 
+                # is in the reflog entry right before the reset operation
+                if i > 0:
+                    prev_entry = reflog_entries[i - 1]
+                    # Extract commit hash from the previous entry
+                    parts = prev_entry.split()
                     if len(parts) >= 1:
                         commit_hash = parts[0]
                         # Verify this is a valid commit hash
