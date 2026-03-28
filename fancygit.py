@@ -1325,6 +1325,22 @@ class FancyGit:
         returncode, current_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
         returncode, target_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1', target_commit])
         
+        # Extract current HEAD commit hash for comparison
+        current_commit = None
+        if current_stdout:
+            current_parts = current_stdout.strip().split()
+            if len(current_parts) >= 1:
+                current_commit = current_parts[0]
+        
+        # Check if we're already at the target commit
+        if current_commit and current_commit.startswith(target_commit[:8]):
+            print(color_success("✅ Already at the most recent commit"))
+            print(color_info("Current state:"))
+            if current_stdout:
+                print(f"  HEAD: {color_success(current_stdout.strip())}")
+            print(color_info("No redo needed - this is already the latest commit"))
+            return True
+        
         print(color_info("Current state:"))
         if current_stdout:
             print(f"  HEAD: {color_info(current_stdout.strip())}")
