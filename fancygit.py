@@ -643,8 +643,8 @@ class FancyGit:
         if returncode == 0 and stdout:
             repo_state['branch'] = stdout.strip()
         
-        # Get porcelain status for parsing
-        returncode, stdout, stderr = self.runner.run_git_command(['status', '--porcelain'])
+        # Get porcelain status for parsing (excluding ignored files)
+        returncode, stdout, stderr = self.runner.run_git_command(['status', '--porcelain', '--ignored'])
         if returncode == 0 and stdout:
             for line in stdout.strip().split('\n'):
                 if line.strip():
@@ -655,10 +655,13 @@ class FancyGit:
                         repo_state['conflicts'].append(file_path)
                     elif status[0] in ['A', 'M', 'D', 'R', 'C']:
                         repo_state['staged'].append(file_path)
-                    elif status[1] in ['M', 'D']:
+                    elif status[1] in ['M', 'D'] or status[0] == 'M':
                         repo_state['modified'].append(file_path)
                     elif status == '??':
                         repo_state['untracked'].append(file_path)
+                    # Skip ignored files (status starts with '!!')
+                    elif status == '!!':
+                        continue
         
         # Check if working directory is clean
         repo_state['clean'] = (not repo_state['staged'] and 
