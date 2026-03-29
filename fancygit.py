@@ -507,7 +507,25 @@ class FancyGit:
         
         # Handle quiz command
         if command == 'quiz':
-            return self.quiz_manager.launch_quiz()
+            import subprocess
+            import sys
+            script_dir = os.path.dirname(os.path.realpath(__file__))
+            quiz_server_script = os.path.join(script_dir, 'quiz_server.py')
+            
+            try:
+                # Execute quiz_server.py script and handle KeyboardInterrupt gracefully
+                result = subprocess.run([sys.executable, quiz_server_script], check=False)
+                return result.returncode == 0
+            except KeyboardInterrupt:
+                # User pressed Ctrl+C, this is normal behavior
+                print(color_info("\n🛑 Quiz server stopped by user"))
+                return True
+            except FileNotFoundError:
+                print(color_error("❌ quiz_server.py not found"))
+                return False
+            except Exception as e:
+                print(color_error(f"❌ Failed to start quiz server: {e}"))
+                return False
         
         return self._command_handler(command, *args)
  
