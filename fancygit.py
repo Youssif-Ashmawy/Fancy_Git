@@ -4,6 +4,10 @@ import re
 import sys
 import os
 import webbrowser
+import json
+import random
+import threading
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 from prompt_toolkit import prompt
 
 # Handle both direct execution and module import
@@ -17,6 +21,7 @@ try:
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
+    from src.quiz_manager import QuizManager
     from welcome import show_welcome
 except ImportError:
     # When installed as a module, add the current directory to path
@@ -32,6 +37,7 @@ except ImportError:
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
+    from src.quiz_manager import QuizManager
     from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -65,6 +71,9 @@ class FancyGit:
         self.output_coloring_enabled = self._load_output_coloring_state()
         self.loading_animation_type = self._load_animation_type()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
+        
+        # Initialize quiz manager
+        self.quiz_manager = QuizManager()
     
     def _load_commands(self):
         """Dynamically load commands from command-list.txt file"""
@@ -495,6 +504,10 @@ class FancyGit:
             except Exception as e:
                 print(color_error(f"Failed to visualize repo: {e}"))
                 return False
+        
+        # Handle quiz command
+        if command == 'quiz':
+            return self.quiz_manager.launch_quiz()
         
         return self._command_handler(command, *args)
  

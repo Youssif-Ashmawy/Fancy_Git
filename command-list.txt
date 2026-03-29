@@ -32,6 +32,7 @@ mv
 notes
 pull
 push
+quiz
 range-diff
 rebase
 redo
