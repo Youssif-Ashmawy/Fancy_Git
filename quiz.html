@@ -332,6 +332,160 @@
         .unanswered-questions {
             font-weight: bold;
         }
+        
+        .ordering-options {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .ordering-item {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: move;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        
+        .ordering-item:hover {
+            border-color: #4ECDC4;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .ordering-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+        
+        .ordering-item.drag-over {
+            border-color: #007bff;
+            background: #e8f4f8;
+        }
+        
+        .order-number {
+            background: #4ECDC4;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .order-text {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+        
+        .drag-handle {
+            color: #6c757d;
+            margin-left: 10px;
+            font-size: 1.2em;
+            cursor: grab;
+        }
+        
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .ordering-instructions {
+            background: #e8f4f8;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        
+        .confirm-order-btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1em;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .confirm-order-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .confirm-order-btn.confirmed {
+            background: linear-gradient(45deg, #6c757d, #5a6268);
+            cursor: default;
+        }
+        
+        .confirm-order-btn.confirmed:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .ordering-options.completed {
+            position: relative;
+        }
+        
+        .ordering-options.completed::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5em;
+            color: #28a745;
+            background: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .ordering-options.completed .ordering-item {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        
+        .ordering-options.completed .ordering-item:hover {
+            border-color: #20c997;
+            background: #c3e6cb;
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .ordering-options.completed .ordering-item .drag-handle {
+            color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .ordering-options.completed .order-number {
+            background: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -351,589 +505,625 @@
         
         <div id="quiz-container" class="quiz-content">
 
-            <div class="question active" data-question="1" data-answer="B">
+            <div class="question active" data-question="1" data-answer="B" data-type="theory" data-options='["logs", "recovery", "commit", "merge"]'>
                 <h3>
-                    1. Cherry-pick use case:
-                    <span class="level-badge level-intermediate">intermediate</span>
+                    1. Reflog useful for:
+                    <span class="level-badge level-advanced">advanced</span>
                     <span class="type-badge type-theory">theory</span>
                 </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q1" value="A">
-                            <span>A. merge all</span>
+                            <span>A. logs</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q1" value="B">
-                            <span>B. selective fix</span>
+                            <span>B. recovery</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q1" value="C">
-                            <span>C. delete branch</span>
+                            <span>C. commit</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q1" value="D">
-                            <span>D. reset repo</span>
+                            <span>D. merge</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
-            <div class="question " data-question="2" data-answer="B">
+            <div class="question " data-question="2" data-answer="B" data-type="theory" data-options='["split commits", "combine commits", "delete branch", "stash"]'>
                 <h3>
-                    2. Reset vs checkout difference:
+                    2. Rebase interactive squash does:
                     <span class="level-badge level-challenging">challenging</span>
                     <span class="type-badge type-theory">theory</span>
                 </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q2" value="A">
-                            <span>A. none</span>
+                            <span>A. split commits</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q2" value="B">
-                            <span>B. reset affects index</span>
+                            <span>B. combine commits</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q2" value="C">
-                            <span>C. checkout deletes</span>
+                            <span>C. delete branch</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q2" value="D">
-                            <span>D. same</span>
+                            <span>D. stash</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
-            <div class="question " data-question="3" data-answer="B">
+            <div class="question " data-question="3" data-answer="C" data-type="theory" data-options='["Remote logs", "Branch history", "HEAD history", "Commit diff"]'>
                 <h3>
-                    3. git add . misses:
-                    <span class="level-badge level-advanced">advanced</span>
+                    3. git reflog shows:
+                    <span class="level-badge level-beginner">beginner</span>
                     <span class="type-badge type-theory">theory</span>
                 </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q3" value="A">
-                            <span>A. new files</span>
+                            <span>A. Remote logs</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q3" value="B">
-                            <span>B. deletions outside dir</span>
+                            <span>B. Branch history</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q3" value="C">
-                            <span>C. commits</span>
+                            <span>C. HEAD history</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q3" value="D">
-                            <span>D. staging</span>
+                            <span>D. Commit diff</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
-            <div class="question " data-question="4" data-answer="C">
+            <div class="question " data-question="4" data-answer="B" data-type="theory" data-options='["merging", "history editing", "pushing", "stashing"]'>
                 <h3>
-                    4. git reset --hard affects:
-                    <span class="level-badge level-beginner">beginner</span>
+                    4. Rebase interactive used for:
+                    <span class="level-badge level-advanced">advanced</span>
                     <span class="type-badge type-theory">theory</span>
                 </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q4" value="A">
-                            <span>A. Nothing</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q4" value="B">
-                            <span>B. Only staging</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q4" value="C">
-                            <span>C. Files + history</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q4" value="D">
-                            <span>D. Remote</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="5" data-answer="B">
-                <h3>
-                    5. git stash does:
-                    <span class="level-badge level-beginner">beginner</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q5" value="A">
-                            <span>A. Commits changes</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q5" value="B">
-                            <span>B. Saves changes temporarily</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q5" value="C">
-                            <span>C. Deletes files</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q5" value="D">
-                            <span>D. Pushes code</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="6" data-answer="B">
-                <h3>
-                    6. Stash used when:
-                    <span class="level-badge level-intermediate">intermediate</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q6" value="A">
-                            <span>A. committing</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q6" value="B">
-                            <span>B. switching branches</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q6" value="C">
-                            <span>C. pushing</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q6" value="D">
-                            <span>D. merging</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="7" data-answer="B">
-                <h3>
-                    7. git rebase does:
-                    <span class="level-badge level-beginner">beginner</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q7" value="A">
-                            <span>A. Deletes commits</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q7" value="B">
-                            <span>B. Rewrites history</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q7" value="C">
-                            <span>C. Pushes code</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q7" value="D">
-                            <span>D. Pulls changes</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="8" data-answer="B">
-                <h3>
-                    8. Reflog entry lifetime:
-                    <span class="level-badge level-challenging">challenging</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q8" value="A">
-                            <span>A. forever</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q8" value="B">
-                            <span>B. limited</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q8" value="C">
-                            <span>C. remote</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q8" value="D">
-                            <span>D. fixed</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="9" data-answer="B">
-                <h3>
-                    9. You rebased and force pushed. Teammate lost commits. Root issue?
-                    <span class="level-badge level-challenging">challenging</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q9" value="A">
-                            <span>A. merge</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q9" value="B">
-                            <span>B. history rewrite</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q9" value="C">
-                            <span>C. stash</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q9" value="D">
-                            <span>D. reset</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="10" data-answer="B">
-                <h3>
-                    10. git add -A will:
-                    <span class="level-badge level-beginner">beginner</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q10" value="A">
-                            <span>A. Add only new files</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q10" value="B">
-                            <span>B. Add all changes including deletions</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q10" value="C">
-                            <span>C. Add only staged files</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q10" value="D">
-                            <span>D. Ignore deleted files</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="11" data-answer="B">
-                <h3>
-                    11. You want to undo last commit and discard changes completely.
-                    <span class="level-badge level-intermediate">intermediate</span>
-                    <span class="type-badge type-scenario">scenario</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q11" value="A">
-                            <span>A. git reset --soft</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q11" value="B">
-                            <span>B. git reset --hard HEAD~1</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q11" value="C">
-                            <span>C. git revert</span>
-                        </label>
-                    </li>
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q11" value="D">
-                            <span>D. git stash</span>
-                        </label>
-                    </li>
-
-                </ul>
-            </div>
-
-            <div class="question " data-question="12" data-answer="B">
-                <h3>
-                    12. Rebase interactive used for:
-                    <span class="level-badge level-advanced">advanced</span>
-                    <span class="type-badge type-theory">theory</span>
-                </h3>
-                <ul class="options">
-
-                    <li>
-                        <label>
-                            <input type="radio" name="q12" value="A">
                             <span>A. merging</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
-                            <input type="radio" name="q12" value="B">
+                            <input type="radio" name="q4" value="B">
                             <span>B. history editing</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
-                            <input type="radio" name="q12" value="C">
+                            <input type="radio" name="q4" value="C">
                             <span>C. pushing</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
-                            <input type="radio" name="q12" value="D">
+                            <input type="radio" name="q4" value="D">
                             <span>D. stashing</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
-            <div class="question " data-question="13" data-answer="B">
+            <div class="question " data-question="5" data-answer="B" data-type="theory" data-options='["impossible", "reflog", "merge", "stash"]'>
                 <h3>
-                    13. Cherry-pick preserves commit hash:
+                    5. Recover commit after hard reset:
                     <span class="level-badge level-advanced">advanced</span>
                     <span class="type-badge type-theory">theory</span>
                 </h3>
+
+                <ul class="options">
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q5" value="A">
+                            <span>A. impossible</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q5" value="B">
+                            <span>B. reflog</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q5" value="C">
+                            <span>C. merge</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q5" value="D">
+                            <span>D. stash</span>
+                        </label>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            <div class="question " data-question="6" data-answer="B" data-type="theory" data-options='["both same", "revert adds commit", "reset safer", "revert deletes history"]'>
+                <h3>
+                    6. Reset vs revert difference:
+                    <span class="level-badge level-intermediate">intermediate</span>
+                    <span class="type-badge type-theory">theory</span>
+                </h3>
+
+                <ul class="options">
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q6" value="A">
+                            <span>A. both same</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q6" value="B">
+                            <span>B. revert adds commit</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q6" value="C">
+                            <span>C. reset safer</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q6" value="D">
+                            <span>D. revert deletes history</span>
+                        </label>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            <div class="question " data-question="7" data-answer="A" data-type="scenario" data-options='["git reset HEAD", "git reset --hard", "git revert", "git clean"]'>
+                <h3>
+                    7. You want to undo staging but keep working changes.
+                    <span class="level-badge level-challenging">challenging</span>
+                    <span class="type-badge type-scenario">scenario</span>
+                </h3>
+
+                <ul class="options">
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q7" value="A">
+                            <span>A. git reset HEAD</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q7" value="B">
+                            <span>B. git reset --hard</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q7" value="C">
+                            <span>C. git revert</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q7" value="D">
+                            <span>D. git clean</span>
+                        </label>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            <div class="question " data-question="8" data-answer="A" data-type="scenario" data-options='["git reset HEAD file", "git revert file", "git rm file", "git clean"]'>
+                <h3>
+                    8. You accidentally staged a file. You want to unstage it.
+                    <span class="level-badge level-beginner">beginner</span>
+                    <span class="type-badge type-scenario">scenario</span>
+                </h3>
+
+                <ul class="options">
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q8" value="A">
+                            <span>A. git reset HEAD file</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q8" value="B">
+                            <span>B. git revert file</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q8" value="C">
+                            <span>C. git rm file</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q8" value="D">
+                            <span>D. git clean</span>
+                        </label>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            <div class="question " data-question="9" data-answer="B" data-type="theory" data-options='["Merge branch", "Select commit", "Delete commit", "Reset branch"]'>
+                <h3>
+                    9. Cherry-pick means:
+                    <span class="level-badge level-beginner">beginner</span>
+                    <span class="type-badge type-theory">theory</span>
+                </h3>
+
+                <ul class="options">
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q9" value="A">
+                            <span>A. Merge branch</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q9" value="B">
+                            <span>B. Select commit</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q9" value="C">
+                            <span>C. Delete commit</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q9" value="D">
+                            <span>D. Reset branch</span>
+                        </label>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            <div class="question " data-question="10" data-answer="ABCD" data-type="ordering" data-options='["git merge feature-branch", "git add resolved-files", "git commit", "git push"]'>
+                <h3>
+                    10. Order the steps to resolve merge conflicts and complete merge:
+                    <span class="level-badge level-challenging">challenging</span>
+                    <span class="type-badge type-ordering">ordering</span>
+                </h3>
+
+                <div class="ordering-instructions">
+                    📝 <strong>Drag and drop the steps to arrange them in the correct order:</strong>
+                </div>
+                <ul class="ordering-options" id="ordering-10">
+
+                    <li class="ordering-item" draggable="true" data-option="A">
+                        <span class="order-number">1</span>
+                        <span class="order-text">git merge feature-branch</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                    <li class="ordering-item" draggable="true" data-option="B">
+                        <span class="order-number">2</span>
+                        <span class="order-text">git add resolved-files</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                    <li class="ordering-item" draggable="true" data-option="C">
+                        <span class="order-number">3</span>
+                        <span class="order-text">git commit</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                    <li class="ordering-item" draggable="true" data-option="D">
+                        <span class="order-number">4</span>
+                        <span class="order-text">git push</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                </ul>
+                <button class="confirm-order-btn" id="confirm-btn-10" onclick="confirmOrder(10)">
+                    <span>✓</span>
+                    <span>Confirm Order</span>
+                </button>
+
+            </div>
+
+            <div class="question " data-question="11" data-answer="B" data-type="theory" data-options='["remote", "HEAD moves", "files", "branches only"]'>
+                <h3>
+                    11. Reflog tracks:
+                    <span class="level-badge level-intermediate">intermediate</span>
+                    <span class="type-badge type-theory">theory</span>
+                </h3>
+
+                <ul class="options">
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q11" value="A">
+                            <span>A. remote</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q11" value="B">
+                            <span>B. HEAD moves</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q11" value="C">
+                            <span>C. files</span>
+                        </label>
+                    </li>
+
+                    <li>
+                        <label>
+                            <input type="radio" name="q11" value="D">
+                            <span>D. branches only</span>
+                        </label>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            <div class="question " data-question="12" data-answer="CAB" data-type="ordering" data-options='["git add .", "git commit -m 'Initial commit'", "git init", "git remote add origin <url>"]'>
+                <h3>
+                    12. Order the steps to make your first commit:
+                    <span class="level-badge level-beginner">beginner</span>
+                    <span class="type-badge type-ordering">ordering</span>
+                </h3>
+
+                <div class="ordering-instructions">
+                    📝 <strong>Drag and drop the steps to arrange them in the correct order:</strong>
+                </div>
+                <ul class="ordering-options" id="ordering-12">
+
+                    <li class="ordering-item" draggable="true" data-option="D">
+                        <span class="order-number">1</span>
+                        <span class="order-text">git remote add origin <url></span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                    <li class="ordering-item" draggable="true" data-option="C">
+                        <span class="order-number">2</span>
+                        <span class="order-text">git init</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                    <li class="ordering-item" draggable="true" data-option="B">
+                        <span class="order-number">3</span>
+                        <span class="order-text">git commit -m 'Initial commit'</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                    <li class="ordering-item" draggable="true" data-option="A">
+                        <span class="order-number">4</span>
+                        <span class="order-text">git add .</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+
+                </ul>
+                <button class="confirm-order-btn" id="confirm-btn-12" onclick="confirmOrder(12)">
+                    <span>✓</span>
+                    <span>Confirm Order</span>
+                </button>
+
+            </div>
+
+            <div class="question " data-question="13" data-answer="B" data-type="theory" data-options='["reset preferred", "revert preferred", "both same", "none"]'>
+                <h3>
+                    13. Reset vs revert in team:
+                    <span class="level-badge level-advanced">advanced</span>
+                    <span class="type-badge type-theory">theory</span>
+                </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q13" value="A">
-                            <span>A. yes</span>
+                            <span>A. reset preferred</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q13" value="B">
-                            <span>B. no</span>
+                            <span>B. revert preferred</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q13" value="C">
-                            <span>C. partial</span>
+                            <span>C. both same</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q13" value="D">
-                            <span>D. depends</span>
+                            <span>D. none</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
-            <div class="question " data-question="14" data-answer="A">
+            <div class="question " data-question="14" data-answer="B" data-type="theory" data-options='["shared branch", "cleaning history", "deleting commits", "merging conflicts"]'>
                 <h3>
-                    14. Cherry-pick ideal for:
-                    <span class="level-badge level-advanced">advanced</span>
+                    14. Rebase is best when:
+                    <span class="level-badge level-intermediate">intermediate</span>
                     <span class="type-badge type-theory">theory</span>
                 </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q14" value="A">
-                            <span>A. hotfix</span>
+                            <span>A. shared branch</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q14" value="B">
-                            <span>B. full merge</span>
+                            <span>B. cleaning history</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q14" value="C">
-                            <span>C. reset</span>
+                            <span>C. deleting commits</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q14" value="D">
-                            <span>D. stash</span>
+                            <span>D. merging conflicts</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
-            <div class="question " data-question="15" data-answer="B">
+            <div class="question " data-question="15" data-answer="B" data-type="theory" data-options='["File", "Commit", "Branch", "Repo"]'>
                 <h3>
-                    15. You cherry-picked but got conflicts across many commits. Best strategy?
-                    <span class="level-badge level-advanced">advanced</span>
-                    <span class="type-badge type-scenario">scenario</span>
+                    15. git cherry-pick applies:
+                    <span class="level-badge level-beginner">beginner</span>
+                    <span class="type-badge type-theory">theory</span>
                 </h3>
+
                 <ul class="options">
 
                     <li>
                         <label>
                             <input type="radio" name="q15" value="A">
-                            <span>A. continue blindly</span>
+                            <span>A. File</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q15" value="B">
-                            <span>B. resolve each commit</span>
+                            <span>B. Commit</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q15" value="C">
-                            <span>C. reset repo</span>
+                            <span>C. Branch</span>
                         </label>
                     </li>
 
                     <li>
                         <label>
                             <input type="radio" name="q15" value="D">
-                            <span>D. force push</span>
+                            <span>D. Repo</span>
                         </label>
                     </li>
 
                 </ul>
+
             </div>
 
         </div>
@@ -976,6 +1166,153 @@
         const totalQuestions = 15;
         const userAnswers = {};
         
+        // Drag and drop functionality for ordering questions
+        let draggedElement = null;
+        
+        function initializeOrderingQuestions() {
+            document.querySelectorAll('.ordering-options').forEach(container => {
+                container.addEventListener('dragstart', handleDragStart);
+                container.addEventListener('dragover', handleDragOver);
+                container.addEventListener('drop', handleDrop);
+                container.addEventListener('dragend', handleDragEnd);
+            });
+        }
+        
+        function handleDragStart(e) {
+            if (e.target.classList.contains('ordering-item')) {
+                // Check if the container is completed (locked)
+                const container = e.target.closest('.ordering-options');
+                if (container && container.classList.contains('completed')) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                draggedElement = e.target;
+                e.target.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', e.target.innerHTML);
+            }
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            
+            // Check if the container is completed (locked)
+            if (e.currentTarget.classList.contains('completed')) {
+                return false;
+            }
+            
+            e.dataTransfer.dropEffect = 'move';
+            
+            const afterElement = getDragAfterElement(e.currentTarget, e.clientY);
+            const dragging = document.querySelector('.dragging');
+            
+            if (afterElement == null) {
+                e.currentTarget.appendChild(dragging);
+            } else {
+                e.currentTarget.insertBefore(dragging, afterElement);
+            }
+            
+            return false;
+        }
+        
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            updateOrderNumbers();
+            return false;
+        }
+        
+        function handleDragEnd(e) {
+            document.querySelectorAll('.ordering-item').forEach(item => {
+                item.classList.remove('dragging');
+                item.classList.remove('drag-over');
+            });
+        }
+        
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.ordering-item:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+        
+        function updateOrderNumbers() {
+            document.querySelectorAll('.ordering-options').forEach(container => {
+                const items = container.querySelectorAll('.ordering-item');
+                items.forEach((item, index) => {
+                    const orderNumber = item.querySelector('.order-number');
+                    orderNumber.textContent = index + 1;
+                });
+            });
+        }
+        
+        function getOrderingAnswer(questionNum) {
+            const container = document.getElementById(`ordering-${questionNum}`);
+            if (!container) return '';
+            
+            const items = container.querySelectorAll('.ordering-item');
+            let answer = '';
+            items.forEach(item => {
+                answer += item.dataset.option;
+            });
+            return answer;
+        }
+        
+        function confirmOrder(questionNum) {
+            const container = document.getElementById(`ordering-${questionNum}`);
+            const button = document.getElementById(`confirm-btn-${questionNum}`);
+            
+            if (!container || !button) {
+                console.error('Container or button not found');
+                return;
+            }
+            
+            const items = container.querySelectorAll('.ordering-item');
+            
+            if (container.classList.contains('completed')) {
+                // Unconfirm - remove completed state and re-enable dragging
+                container.classList.remove('completed');
+                button.classList.remove('confirmed');
+                button.innerHTML = '<span>✓</span><span>Confirm Order</span>';
+                
+                // Re-enable dragging
+                items.forEach(item => {
+                    item.draggable = true;
+                    item.style.cursor = 'move';
+                });
+            } else {
+                // Confirm - add completed state and disable dragging
+                container.classList.add('completed');
+                button.classList.add('confirmed');
+                button.innerHTML = '<span>↺</span><span>Unconfirm Order</span>';
+                
+                // Disable dragging
+                items.forEach(item => {
+                    item.draggable = false;
+                    item.style.cursor = 'default';
+                });
+            }
+            
+            // Update square states to reflect completion
+            updateSquareStates();
+        }
+        
+        // Make sure the function is globally accessible
+        window.confirmOrder = confirmOrder;
+        
         function initializeQuestionSquares() {
             const squaresContainer = document.getElementById('question-squares');
             squaresContainer.innerHTML = '';
@@ -995,13 +1332,26 @@
         function updateSquareStates() {
             for (let i = 1; i <= totalQuestions; i++) {
                 const square = document.getElementById(`square-${i}`);
-                const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
+                const question = document.querySelector(`[data-question="${i}"]`);
+                const questionType = question.dataset.type;
+                
+                let isCompleted = false;
+                
+                if (questionType === 'ordering') {
+                    // Check if ordering question has been confirmed
+                    const container = document.getElementById(`ordering-${i}`);
+                    isCompleted = container && container.classList.contains('completed');
+                } else {
+                    // Check MCQ questions
+                    const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
+                    isCompleted = !!selectedInput;
+                }
                 
                 square.classList.remove('active', 'completed', 'unanswered');
                 
                 if (i === currentQuestion) {
                     square.classList.add('active');
-                } else if (selectedInput) {
+                } else if (isCompleted) {
                     square.classList.add('completed');
                 } else {
                     square.classList.add('unanswered');
@@ -1195,8 +1545,22 @@
             const unansweredQuestions = [];
             
             for (let i = 1; i <= totalQuestions; i++) {
-                const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
-                if (!selectedInput) {
+                const question = document.querySelector(`[data-question="${i}"]`);
+                const questionType = question.dataset.type;
+                
+                let isAnswered = false;
+                
+                if (questionType === 'ordering') {
+                    // Check if ordering question has been confirmed
+                    const container = document.getElementById(`ordering-${i}`);
+                    isAnswered = container && container.classList.contains('completed');
+                } else {
+                    // Check MCQ questions
+                    const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
+                    isAnswered = !!selectedInput;
+                }
+                
+                if (!isAnswered) {
                     unansweredQuestions.push(i);
                 }
             }
@@ -1232,10 +1596,22 @@
             for (let i = 1; i <= totalQuestions; i++) {
                 const question = document.querySelector(`[data-question="${i}"]`);
                 const correctAnswer = question.dataset.answer;
-                const selectedInput = question.querySelector(`input[name="q${i}"]:checked`);
-                const selectedAnswer = selectedInput ? selectedInput.value : '';
+                const questionType = question.dataset.type;
                 
-                const isCorrect = selectedAnswer === correctAnswer;
+                let selectedAnswer = '';
+                let isCorrect = false;
+                
+                if (questionType === 'ordering') {
+                    // Handle ordering questions
+                    selectedAnswer = getOrderingAnswer(i);
+                    isCorrect = selectedAnswer === correctAnswer;
+                } else {
+                    // Handle MCQ questions
+                    const selectedInput = question.querySelector(`input[name="q${i}"]:checked`);
+                    selectedAnswer = selectedInput ? selectedInput.value : '';
+                    isCorrect = selectedAnswer === correctAnswer;
+                }
+                
                 if (isCorrect) {
                     correct++;
                 } else {
@@ -1244,15 +1620,41 @@
                 
                 // Add to review
                 const questionText = question.querySelector('h3').textContent.trim();
-                const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
-                const correctOption = options.find(opt => opt.startsWith(correctAnswer + '.'));
-                const selectedOption = selectedAnswer ? options.find(opt => opt.startsWith(selectedAnswer + '.')) : 'Not answered';
+                
+                let reviewContent = '';
+                if (questionType === 'ordering') {
+                    // For ordering questions, show the user's order vs correct order
+                    const container = document.getElementById(`ordering-${i}`);
+                    const items = container.querySelectorAll('.ordering-item');
+                    const userOrder = Array.from(items).map(item => item.querySelector('.order-text').textContent.trim());
+                    
+                    // Get correct order from question data
+                    const correctOrderData = JSON.parse(question.dataset.options);
+                    const correctOrder = correctAnswer.split('').map(letter => {
+                        const index = letter.charCodeAt(0) - 65; // A=0, B=1, etc.
+                        return correctOrderData[index] || '';
+                    });
+                    
+                    reviewContent = `
+                        <strong>Your order:</strong> ${userOrder.join(' → ')}<br>
+                        <strong>Correct order:</strong> ${correctOrder.join(' → ')}
+                    `;
+                } else {
+                    // For MCQ questions
+                    const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
+                    const correctOption = options.find(opt => opt.startsWith(correctAnswer + '.'));
+                    const selectedOption = selectedAnswer ? options.find(opt => opt.startsWith(selectedAnswer + '.')) : 'Not answered';
+                    
+                    reviewContent = `
+                        <strong>Your answer:</strong> ${selectedOption}<br>
+                        <strong>Correct answer:</strong> ${correctOption}
+                    `;
+                }
                 
                 reviewHtml += `
                     <div class="answer-item ${isCorrect ? 'answer-correct' : 'answer-incorrect'}">
                         <strong>Question ${i}:</strong> ${questionText.split(' Question')[0]}<br>
-                        <strong>Your answer:</strong> ${selectedOption}<br>
-                        <strong>Correct answer:</strong> ${correctOption}
+                        ${reviewContent}
                     </div>
                 `;
             }
@@ -1464,6 +1866,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             initializeQuestionSquares();
+            initializeOrderingQuestions();
             showQuestion(1);
         });
     </script>

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import json
+
 
 class QuizHTMLGenerator:
     def generate_quiz_html(self, questions):
@@ -338,6 +340,160 @@ class QuizHTMLGenerator:
         .unanswered-questions {{
             font-weight: bold;
         }}
+        
+        .ordering-options {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }}
+        
+        .ordering-item {{
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: move;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            position: relative;
+        }}
+        
+        .ordering-item:hover {{
+            border-color: #4ECDC4;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }}
+        
+        .ordering-item.dragging {{
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }}
+        
+        .ordering-item.drag-over {{
+            border-color: #007bff;
+            background: #e8f4f8;
+        }}
+        
+        .order-number {{
+            background: #4ECDC4;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }}
+        
+        .order-text {{
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }}
+        
+        .drag-handle {{
+            color: #6c757d;
+            margin-left: 10px;
+            font-size: 1.2em;
+            cursor: grab;
+        }}
+        
+        .drag-handle:active {{
+            cursor: grabbing;
+        }}
+        
+        .ordering-instructions {{
+            background: #e8f4f8;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }}
+        
+        .confirm-order-btn {{
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1em;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .confirm-order-btn:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }}
+        
+        .confirm-order-btn.confirmed {{
+            background: linear-gradient(45deg, #6c757d, #5a6268);
+            cursor: default;
+        }}
+        
+        .confirm-order-btn.confirmed:hover {{
+            transform: none;
+            box-shadow: none;
+        }}
+        
+        .ordering-options.completed {{
+            position: relative;
+        }}
+        
+        .ordering-options.completed::before {{
+            content: '';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5em;
+            color: #28a745;
+            background: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }}
+        
+        .ordering-options.completed .ordering-item {{
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }}
+        
+        .ordering-options.completed .ordering-item:hover {{
+            border-color: #20c997;
+            background: #c3e6cb;
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }}
+        
+        .ordering-options.completed .ordering-item .drag-handle {{
+            color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }}
+        
+        .ordering-options.completed .order-number {{
+            background: #28a745;
+        }}
     </style>
 </head>
 <body>
@@ -364,19 +520,54 @@ class QuizHTMLGenerator:
             type_class = f"type-{q.get('type', 'theory')}"
             
             html += f"""
-            <div class="question {'active' if i == 1 else ''}" data-question="{i}" data-answer="{q.get('answer', '')}">
+            <div class="question {'active' if i == 1 else ''}" data-question="{i}" data-answer="{q.get('answer', '')}" data-type="{q.get('type', 'theory')}" data-options='{json.dumps(q.get('options', []))}'>
                 <h3>
                     {i}. {q.get('q', '')}
                     <span class="level-badge {level_class}">{q.get('level', 'beginner')}</span>
                     <span class="type-badge {type_class}">{q.get('type', 'theory')}</span>
                 </h3>
-                <ul class="options">
 """
             
-            options = q.get('options', [])
-            for j, option in enumerate(options):
-                option_letter = chr(65 + j)  # A, B, C, D
+            if q.get('type') == 'ordering':
                 html += f"""
+                <div class="ordering-instructions">
+                    📝 <strong>Drag and drop the steps to arrange them in the correct order:</strong>
+                </div>
+                <ul class="ordering-options" id="ordering-{i}">
+"""
+                
+                options = q.get('options', [])
+                # Shuffle options for ordering questions
+                import random
+                shuffled_options = options[:]
+                random.shuffle(shuffled_options)
+                
+                for j, option in enumerate(shuffled_options):
+                    html += f"""
+                    <li class="ordering-item" draggable="true" data-option="{chr(65 + options.index(option))}">
+                        <span class="order-number">{j + 1}</span>
+                        <span class="order-text">{option}</span>
+                        <span class="drag-handle">⋮⋮</span>
+                    </li>
+"""
+                
+                html += f"""
+                </ul>
+                <button class="confirm-order-btn" id="confirm-btn-{i}" onclick="confirmOrder({i})">
+                    <span>✓</span>
+                    <span>Confirm Order</span>
+                </button>
+"""
+            else:
+                # Regular MCQ questions
+                html += """
+                <ul class="options">
+"""
+                
+                options = q.get('options', [])
+                for j, option in enumerate(options):
+                    option_letter = chr(65 + j)  # A, B, C, D
+                    html += f"""
                     <li>
                         <label>
                             <input type="radio" name="q{i}" value="{option_letter}">
@@ -384,9 +575,12 @@ class QuizHTMLGenerator:
                         </label>
                     </li>
 """
+                
+                html += """
+                </ul>
+"""
             
             html += """
-                </ul>
             </div>
 """
         
@@ -431,6 +625,153 @@ class QuizHTMLGenerator:
         const totalQuestions = {len(questions)};
         const userAnswers = {{}};
         
+        // Drag and drop functionality for ordering questions
+        let draggedElement = null;
+        
+        function initializeOrderingQuestions() {{
+            document.querySelectorAll('.ordering-options').forEach(container => {{
+                container.addEventListener('dragstart', handleDragStart);
+                container.addEventListener('dragover', handleDragOver);
+                container.addEventListener('drop', handleDrop);
+                container.addEventListener('dragend', handleDragEnd);
+            }});
+        }}
+        
+        function handleDragStart(e) {{
+            if (e.target.classList.contains('ordering-item')) {{
+                // Check if the container is completed (locked)
+                const container = e.target.closest('.ordering-options');
+                if (container && container.classList.contains('completed')) {{
+                    e.preventDefault();
+                    return false;
+                }}
+                
+                draggedElement = e.target;
+                e.target.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', e.target.innerHTML);
+            }}
+        }}
+        
+        function handleDragOver(e) {{
+            if (e.preventDefault) {{
+                e.preventDefault();
+            }}
+            
+            // Check if the container is completed (locked)
+            if (e.currentTarget.classList.contains('completed')) {{
+                return false;
+            }}
+            
+            e.dataTransfer.dropEffect = 'move';
+            
+            const afterElement = getDragAfterElement(e.currentTarget, e.clientY);
+            const dragging = document.querySelector('.dragging');
+            
+            if (afterElement == null) {{
+                e.currentTarget.appendChild(dragging);
+            }} else {{
+                e.currentTarget.insertBefore(dragging, afterElement);
+            }}
+            
+            return false;
+        }}
+        
+        function handleDrop(e) {{
+            if (e.stopPropagation) {{
+                e.stopPropagation();
+            }}
+            
+            updateOrderNumbers();
+            return false;
+        }}
+        
+        function handleDragEnd(e) {{
+            document.querySelectorAll('.ordering-item').forEach(item => {{
+                item.classList.remove('dragging');
+                item.classList.remove('drag-over');
+            }});
+        }}
+        
+        function getDragAfterElement(container, y) {{
+            const draggableElements = [...container.querySelectorAll('.ordering-item:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {{
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {{
+                    return {{ offset: offset, element: child }};
+                }} else {{
+                    return closest;
+                }}
+            }}, {{ offset: Number.NEGATIVE_INFINITY }}).element;
+        }}
+        
+        function updateOrderNumbers() {{
+            document.querySelectorAll('.ordering-options').forEach(container => {{
+                const items = container.querySelectorAll('.ordering-item');
+                items.forEach((item, index) => {{
+                    const orderNumber = item.querySelector('.order-number');
+                    orderNumber.textContent = index + 1;
+                }});
+            }});
+        }}
+        
+        function getOrderingAnswer(questionNum) {{
+            const container = document.getElementById(`ordering-${{questionNum}}`);
+            if (!container) return '';
+            
+            const items = container.querySelectorAll('.ordering-item');
+            let answer = '';
+            items.forEach(item => {{
+                answer += item.dataset.option;
+            }});
+            return answer;
+        }}
+        
+        function confirmOrder(questionNum) {{
+            const container = document.getElementById(`ordering-${{questionNum}}`);
+            const button = document.getElementById(`confirm-btn-${{questionNum}}`);
+            
+            if (!container || !button) {{
+                console.error('Container or button not found');
+                return;
+            }}
+            
+            const items = container.querySelectorAll('.ordering-item');
+            
+            if (container.classList.contains('completed')) {{
+                // Unconfirm - remove completed state and re-enable dragging
+                container.classList.remove('completed');
+                button.classList.remove('confirmed');
+                button.innerHTML = '<span>✓</span><span>Confirm Order</span>';
+                
+                // Re-enable dragging
+                items.forEach(item => {{
+                    item.draggable = true;
+                    item.style.cursor = 'move';
+                }});
+            }} else {{
+                // Confirm - add completed state and disable dragging
+                container.classList.add('completed');
+                button.classList.add('confirmed');
+                button.innerHTML = '<span>↺</span><span>Unconfirm Order</span>';
+                
+                // Disable dragging
+                items.forEach(item => {{
+                    item.draggable = false;
+                    item.style.cursor = 'default';
+                }});
+            }}
+            
+            // Update square states to reflect completion
+            updateSquareStates();
+        }}
+        
+        // Make sure the function is globally accessible
+        window.confirmOrder = confirmOrder;
+        
         function initializeQuestionSquares() {{
             const squaresContainer = document.getElementById('question-squares');
             squaresContainer.innerHTML = '';
@@ -450,13 +791,26 @@ class QuizHTMLGenerator:
         function updateSquareStates() {{
             for (let i = 1; i <= totalQuestions; i++) {{
                 const square = document.getElementById(`square-${{i}}`);
-                const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                const question = document.querySelector(`[data-question="${{i}}"]`);
+                const questionType = question.dataset.type;
+                
+                let isCompleted = false;
+                
+                if (questionType === 'ordering') {{
+                    // Check if ordering question has been confirmed
+                    const container = document.getElementById(`ordering-${{i}}`);
+                    isCompleted = container && container.classList.contains('completed');
+                }} else {{
+                    // Check MCQ questions
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    isCompleted = !!selectedInput;
+                }}
                 
                 square.classList.remove('active', 'completed', 'unanswered');
                 
                 if (i === currentQuestion) {{
                     square.classList.add('active');
-                }} else if (selectedInput) {{
+                }} else if (isCompleted) {{
                     square.classList.add('completed');
                 }} else {{
                     square.classList.add('unanswered');
@@ -650,8 +1004,22 @@ class QuizHTMLGenerator:
             const unansweredQuestions = [];
             
             for (let i = 1; i <= totalQuestions; i++) {{
-                const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
-                if (!selectedInput) {{
+                const question = document.querySelector(`[data-question="${{i}}"]`);
+                const questionType = question.dataset.type;
+                
+                let isAnswered = false;
+                
+                if (questionType === 'ordering') {{
+                    // Check if ordering question has been confirmed
+                    const container = document.getElementById(`ordering-${{i}}`);
+                    isAnswered = container && container.classList.contains('completed');
+                }} else {{
+                    // Check MCQ questions
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    isAnswered = !!selectedInput;
+                }}
+                
+                if (!isAnswered) {{
                     unansweredQuestions.push(i);
                 }}
             }}
@@ -687,10 +1055,22 @@ class QuizHTMLGenerator:
             for (let i = 1; i <= totalQuestions; i++) {{
                 const question = document.querySelector(`[data-question="${{i}}"]`);
                 const correctAnswer = question.dataset.answer;
-                const selectedInput = question.querySelector(`input[name="q${{i}}"]:checked`);
-                const selectedAnswer = selectedInput ? selectedInput.value : '';
+                const questionType = question.dataset.type;
                 
-                const isCorrect = selectedAnswer === correctAnswer;
+                let selectedAnswer = '';
+                let isCorrect = false;
+                
+                if (questionType === 'ordering') {{
+                    // Handle ordering questions
+                    selectedAnswer = getOrderingAnswer(i);
+                    isCorrect = selectedAnswer === correctAnswer;
+                }} else {{
+                    // Handle MCQ questions
+                    const selectedInput = question.querySelector(`input[name="q${{i}}"]:checked`);
+                    selectedAnswer = selectedInput ? selectedInput.value : '';
+                    isCorrect = selectedAnswer === correctAnswer;
+                }}
+                
                 if (isCorrect) {{
                     correct++;
                 }} else {{
@@ -699,15 +1079,41 @@ class QuizHTMLGenerator:
                 
                 // Add to review
                 const questionText = question.querySelector('h3').textContent.trim();
-                const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
-                const correctOption = options.find(opt => opt.startsWith(correctAnswer + '.'));
-                const selectedOption = selectedAnswer ? options.find(opt => opt.startsWith(selectedAnswer + '.')) : 'Not answered';
+                
+                let reviewContent = '';
+                if (questionType === 'ordering') {{
+                    // For ordering questions, show the user's order vs correct order
+                    const container = document.getElementById(`ordering-${{i}}`);
+                    const items = container.querySelectorAll('.ordering-item');
+                    const userOrder = Array.from(items).map(item => item.querySelector('.order-text').textContent.trim());
+                    
+                    // Get correct order from question data
+                    const correctOrderData = JSON.parse(question.dataset.options);
+                    const correctOrder = correctAnswer.split('').map(letter => {{
+                        const index = letter.charCodeAt(0) - 65; // A=0, B=1, etc.
+                        return correctOrderData[index] || '';
+                    }});
+                    
+                    reviewContent = `
+                        <strong>Your order:</strong> ${{userOrder.join(' → ')}}<br>
+                        <strong>Correct order:</strong> ${{correctOrder.join(' → ')}}
+                    `;
+                }} else {{
+                    // For MCQ questions
+                    const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
+                    const correctOption = options.find(opt => opt.startsWith(correctAnswer + '.'));
+                    const selectedOption = selectedAnswer ? options.find(opt => opt.startsWith(selectedAnswer + '.')) : 'Not answered';
+                    
+                    reviewContent = `
+                        <strong>Your answer:</strong> ${{selectedOption}}<br>
+                        <strong>Correct answer:</strong> ${{correctOption}}
+                    `;
+                }}
                 
                 reviewHtml += `
                     <div class="answer-item ${{isCorrect ? 'answer-correct' : 'answer-incorrect'}}">
                         <strong>Question ${{i}}:</strong> ${{questionText.split(' Question')[0]}}<br>
-                        <strong>Your answer:</strong> ${{selectedOption}}<br>
-                        <strong>Correct answer:</strong> ${{correctOption}}
+                        ${{reviewContent}}
                     </div>
                 `;
             }}
@@ -919,6 +1325,7 @@ class QuizHTMLGenerator:
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {{
             initializeQuestionSquares();
+            initializeOrderingQuestions();
             showQuestion(1);
         }});
     </script>

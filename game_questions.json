@@ -140,7 +140,17 @@
     {"id":137,"level":"challenging","type":"scenario","q":"You need to reapply commits but preserve original branch untouched.","options":["merge","rebase","cherry-pick","reset"],"answer":"C"},
     {"id":138,"level":"challenging","type":"scenario","q":"You want to undo staging but keep working changes.","options":["git reset HEAD","git reset --hard","git revert","git clean"],"answer":"A"},
     {"id":139,"level":"challenging","type":"scenario","q":"You want to clean history but branch is shared. Best move?","options":["rebase","reset","merge","force push"],"answer":"C"},
-    {"id":140,"level":"challenging","type":"scenario","q":"You must recover lost work after multiple destructive operations. Best priority?","options":["reset","reflog","stash","merge"],"answer":"B"}
+    {"id":140,"level":"challenging","type":"scenario","q":"You must recover lost work after multiple destructive operations. Best priority?","options":["reset","reflog","stash","merge"],"answer":"B"},
+    {"id":141,"level":"intermediate","type":"ordering","q":"Order the steps to create a new feature branch and push it to remote:","options":["git checkout -b feature-branch","git add .","git commit -m 'Add feature'","git push -u origin feature-branch"],"answer":"ABCD"},
+    {"id":142,"level":"intermediate","type":"ordering","q":"Order the steps to undo the last commit but keep changes staged:","options":["git reset --soft HEAD~1","git add .","git commit --amend","git push"],"answer":"A"},
+    {"id":143,"level":"intermediate","type":"ordering","q":"Order the steps to temporarily save changes and work on something else:","options":["git stash","git checkout other-branch","git work","git stash pop"],"answer":"ABCD"},
+    {"id":144,"level":"intermediate","type":"ordering","q":"Order the steps to apply a specific commit from another branch:","options":["git checkout target-branch","git cherry-pick <commit-hash>","git push","git checkout source-branch"],"answer":"BA"},
+    {"id":145,"level":"advanced","type":"ordering","q":"Order the steps to safely update a shared branch with remote changes:","options":["git checkout main","git pull","git merge feature-branch","git push origin main"],"answer":"ABCD"},
+    {"id":146,"level":"advanced","type":"ordering","q":"Order the steps to clean up commits before merging:","options":["git rebase -i HEAD~3","git push --force-with-lease","git checkout main","git merge feature-branch"],"answer":"ABCD"},
+    {"id":147,"level":"advanced","type":"ordering","q":"Order the steps to recover from an accidental reset --hard:","options":["git reflog","git reset --hard <lost-commit-hash>","git push --force-with-lease","git verify changes"],"answer":"AB"},
+    {"id":148,"level":"beginner","type":"ordering","q":"Order the steps to make your first commit:","options":["git add .","git commit -m 'Initial commit'","git init","git remote add origin <url>"],"answer":"CAB"},
+    {"id":149,"level":"beginner","type":"ordering","q":"Order the steps to push existing changes to GitHub:","options":["git add .","git commit -m 'Changes'","git push","git pull origin main"],"answer":"ABCD"},
+    {"id":150,"level":"challenging","type":"ordering","q":"Order the steps to resolve merge conflicts and complete merge:","options":["git merge feature-branch","git add resolved-files","git commit","git push"],"answer":"ABCD"}
 
     
 ]
