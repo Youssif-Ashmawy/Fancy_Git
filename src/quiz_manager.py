@@ -102,11 +102,11 @@ class QuizManager:
                     try:
                         result = quiz_manager_instance._regenerate_quiz(script_dir)
                         if result:
-                            # Return JSON response with new questions and status
-                            self.send_response(200)
-                            self.send_header('Content-type', 'application/json')
+                            # HTML was already generated, redirect to quiz page
+                            self.send_response(302)
+                            self.send_header('Location', '/quiz')
                             self.end_headers()
-                            self.wfile.write(json.dumps(result).encode())
+                            self.wfile.write(b'Redirecting to quiz...')
                         else:
                             self.send_response(500)
                             self.send_header('Content-type', 'application/json')
@@ -126,6 +126,27 @@ class QuizManager:
                         self.send_header('Content-type', 'application/json')
                         self.end_headers()
                         self.wfile.write(json.dumps(result).encode())
+                    except Exception as e:
+                        self.send_response(500)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': str(e)}).encode())
+                    return
+
+                if self.path == '/reset-quiz':
+                    try:
+                        result = quiz_manager_instance._reset_quiz(script_dir)
+                        if result:
+                            # HTML was already generated, redirect to quiz page
+                            self.send_response(302)
+                            self.send_header('Location', '/quiz')
+                            self.end_headers()
+                            self.wfile.write(b'Redirecting to quiz...')
+                        else:
+                            self.send_response(500)
+                            self.send_header('Content-type', 'application/json')
+                            self.end_headers()
+                            self.wfile.write(json.dumps({'error': 'Failed to reset quiz'}).encode())
                     except Exception as e:
                         self.send_response(500)
                         self.send_header('Content-type', 'application/json')
@@ -167,15 +188,25 @@ class QuizManager:
         # Check if we have enough unused questions
         questions_needed = 15
         pool_exhausted = False
+        showing_remaining = False
         
         if len(unused_questions) < questions_needed:
-            pool_exhausted = True
-            # Reset the used questions pool
-            used_ids = []
-            unused_questions = all_questions[:]
-
-        quiz_questions = random.sample(unused_questions, questions_needed)
-        random.shuffle(quiz_questions)
+            if len(unused_questions) > 0:
+                # Show remaining questions instead of resetting pool
+                showing_remaining = True
+                quiz_questions = unused_questions[:]  # Use all remaining questions
+                random.shuffle(quiz_questions)
+            else:
+                # No questions left, reset the pool
+                pool_exhausted = True
+                used_ids = []
+                unused_questions = all_questions[:]
+                quiz_questions = random.sample(unused_questions, questions_needed)
+                random.shuffle(quiz_questions)
+        else:
+            # Enough questions available, proceed normally
+            quiz_questions = random.sample(unused_questions, questions_needed)
+            random.shuffle(quiz_questions)
 
         selected_ids = [q.get('id') for q in quiz_questions if q.get('id') is not None]
         try:
@@ -191,14 +222,24 @@ class QuizManager:
         with open(quiz_file, 'w') as f:
             f.write(html_content)
 
+        # Create appropriate message
+        if showing_remaining:
+            message = f'Showing remaining {len(quiz_questions)} questions - pool will reset next time!'
+        elif pool_exhausted:
+            message = 'Question pool has been reset - all questions are now available!'
+        else:
+            message = 'New questions generated successfully!'
+
         return {
             'success': True,
             'questions': quiz_questions,
             'pool_exhausted': pool_exhausted,
+            'showing_remaining': showing_remaining,
             'total_questions': total_questions,
             'used_count': used_count,
             'unused_count': unused_count,
-            'message': 'Question pool has been reset - all questions are now available!' if pool_exhausted else 'New questions generated successfully!'
+            'actual_question_count': len(quiz_questions),
+            'message': message
         }
 
     def _get_question_status(self, script_dir):
@@ -225,3 +266,40 @@ class QuizManager:
             'unused_count': len(unused_questions),
             'can_generate': len(unused_questions) >= 15
         }
+
+    def _reset_quiz(self, script_dir):
+        """Reset all used questions and generate a fresh quiz"""
+        questions_file = os.path.join(script_dir, 'game_questions.json')
+        used_questions_file = os.path.join(script_dir, '.used_questions.json')
+
+        with open(questions_file, 'r') as f:
+            all_questions = json.load(f)
+
+        # Reset used questions to empty list
+        used_ids = []
+        try:
+            with open(used_questions_file, 'w') as f:
+                json.dump([], f, indent=2)
+        except Exception:
+            pass
+
+        # Generate fresh quiz from all questions
+        questions_needed = 15
+        quiz_questions = random.sample(all_questions, questions_needed)
+        random.shuffle(quiz_questions)
+
+        # Mark these questions as used
+        selected_ids = [q.get('id') for q in quiz_questions if q.get('id') is not None]
+        try:
+            with open(used_questions_file, 'w') as f:
+                json.dump(selected_ids, f, indent=2)
+        except Exception:
+            pass
+
+        # Generate HTML content
+        html_content = self.html_generator.generate_quiz_html(quiz_questions)
+        quiz_file = os.path.join(script_dir, 'quiz.html')
+        with open(quiz_file, 'w') as f:
+            f.write(html_content)
+
+        return True

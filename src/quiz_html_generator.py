@@ -509,6 +509,53 @@ class QuizHTMLGenerator:
             opacity: 0.5;
         }}
         
+        .submit-quiz-btn {{
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: none;
+        }}
+        
+        .submit-quiz-btn:hover {{
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+        }}
+        
+        .submit-quiz-btn:active {{
+            transform: translateY(0);
+        }}
+        
+        .submit-quiz-btn.visible {{
+            display: block;
+        }}
+        
+        .submit-quiz-container {{
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: none;
+        }}
+        
+        .submit-quiz-container.visible {{
+            display: block;
+        }}
+        
+        .header {{
+            position: relative;
+        }}
+        
         .ordering-options.completed .order-number {{
             background: #28a745;
         }}
@@ -521,6 +568,9 @@ class QuizHTMLGenerator:
             <p>Test your Git knowledge with {len(questions)} questions</p>
             <div class="progress-bar">
                 <div class="progress-fill" id="progress"></div>
+            </div>
+            <div class="submit-quiz-container" id="submit-quiz-container">
+                <button class="submit-quiz-btn" id="submit-quiz-btn" onclick="submitQuiz()">Submit Quiz</button>
             </div>
         </div>
         
@@ -643,8 +693,17 @@ class QuizHTMLGenerator:
             <div id="score" class="score"></div>
             <div id="score-message"></div>
             <div id="answer-review" class="answer-review"></div>
+            
+            <!-- Remaining Questions Section -->
+            <div id="remaining-questions" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e9ecef;">
+                <h3 style="color: #495057; margin-bottom: 15px;">📊 Remaining Questions in Bank</h3>
+                <div id="remaining-questions-list" style="font-size: 0.9em; color: #6c757d;"></div>
+                <div id="remaining-questions-message" style="margin-top: 10px; font-weight: 600; color: #856404;"></div>
+            </div>
+            
             <div id="result-buttons">
                 <button class="btn btn-secondary" id="retry-failed-btn" onclick="retryFailedQuestions()" style="display: none;">Retry Failed Questions</button>
+                <button class="btn btn-warning" id="retry-quiz-btn" onclick="retryQuiz()">Retry Quiz (Reset All)</button>
                 <button class="btn" onclick="generateNewQuestions()">Generate New Questions</button>
             </div>
         </div>
@@ -806,12 +865,26 @@ class QuizHTMLGenerator:
                 }});
             }}
             
-            // Update square states to reflect completion
+            // Update submit button visibility
             updateSquareStates();
         }}
         
         // Make sure the function is globally accessible
         window.confirmOrder = confirmOrder;
+        
+        // Add event listeners for radio button changes
+        document.addEventListener('DOMContentLoaded', function() {{
+            // Listen for radio button and checkbox changes (actual answer selections)
+            document.addEventListener('change', function(e) {{
+                if ((e.target.type === 'radio' || e.target.type === 'checkbox') && e.target.checked) {{
+                    if (window.retryMode) {{
+                        updateRetrySquareStates(); // Use retry function in retry mode
+                    }} else {{
+                        updateSquareStates(); // Use normal function in normal mode
+                    }}
+                }}
+            }});
+        }});
         
         function initializeQuestionSquares() {{
             const squaresContainer = document.getElementById('question-squares');
@@ -829,7 +902,7 @@ class QuizHTMLGenerator:
             updateSquareStates();
         }}
         
-        function updateSquareStates() {{
+        function updateSquareVisuals() {{
             for (let i = 1; i <= totalQuestions; i++) {{
                 const square = document.getElementById(`square-${{i}}`);
                 const question = document.querySelector(`[data-question="${{i}}"]`);
@@ -863,6 +936,114 @@ class QuizHTMLGenerator:
             }}
         }}
         
+        function updateSquareStates() {{
+            let allAnswered = true;
+            let lastUnansweredQuestion = 0;
+            
+            for (let i = 1; i <= totalQuestions; i++) {{
+                const square = document.getElementById(`square-${{i}}`);
+                const question = document.querySelector(`[data-question="${{i}}"]`);
+                const questionType = question.dataset.type;
+                
+                let isCompleted = false;
+                
+                if (questionType === 'ordering') {{
+                    // Check if ordering question has been confirmed
+                    const container = document.getElementById(`ordering-${{i}}`);
+                    isCompleted = container && container.classList.contains('completed');
+                }} else if (questionType === 'multiple_answer') {{
+                    // Check if at least one checkbox is selected for multiple answer questions
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isCompleted = selectedInputs.length > 0;
+                }} else {{
+                    // Check MCQ questions
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    isCompleted = !!selectedInput;
+                }}
+                
+                square.classList.remove('active', 'completed', 'unanswered');
+                
+                if (i === currentQuestion) {{
+                    square.classList.add('active');
+                }} else if (isCompleted) {{
+                    square.classList.add('completed');
+                }} else {{
+                    square.classList.add('unanswered');
+                    allAnswered = false;
+                    lastUnansweredQuestion = i; // Track the last unanswered question
+                }}
+            }}
+            
+            // Update submit button visibility - only show if all questions answered
+            // Don't show button just because we're on the last unanswered question
+            const shouldShow = allAnswered;
+            updateSubmitButton(shouldShow);
+        }}
+        
+        function isQuestionAnswered(questionNum) {{
+            const question = document.querySelector(`[data-question="${{questionNum}}"]`);
+            if (!question) return false;
+            
+            const questionType = question.dataset.type;
+            
+            if (questionType === 'ordering') {{
+                const container = document.getElementById(`ordering-${{questionNum}}`);
+                return container && container.classList.contains('completed');
+            }} else if (questionType === 'multiple_answer') {{
+                const selectedInputs = document.querySelectorAll(`input[name="q${{questionNum}}"]:checked`);
+                return selectedInputs.length > 0;
+            }} else {{
+                const selectedInput = document.querySelector(`input[name="q${{questionNum}}"]:checked`);
+                return !!selectedInput;
+            }}
+        }}
+        
+        function updateSubmitButton(allAnswered) {{
+            const submitBtn = document.getElementById('submit-quiz-btn');
+            const submitContainer = document.getElementById('submit-quiz-container');
+            const isResultsPage = document.getElementById('results').style.display === 'block';
+            const isRetryPage = document.getElementById('retry-results').style.display === 'block';
+            
+            if (submitBtn && submitContainer) {{
+                // In retry mode, use separate logic
+                if (window.retryMode) {{
+                    // Don't update button in retry mode - handled by updateRetrySquareStates
+                    return;
+                }}
+                
+                // Only show button if all questions are answered AND we're not on results/retry pages
+                if (allAnswered && !isResultsPage && !isRetryPage) {{
+                    submitBtn.classList.add('visible');
+                    submitContainer.classList.add('visible');
+                    submitBtn.textContent = 'Submit Quiz';
+                }} else {{
+                    submitBtn.classList.remove('visible');
+                    submitContainer.classList.remove('visible');
+                }}
+            }}
+        }}
+        
+        function updateRetrySubmitButton(allRetryAnswered, lastRetryQuestionAnswered) {{
+            const submitBtn = document.getElementById('submit-quiz-btn');
+            const submitContainer = document.getElementById('submit-quiz-container');
+            const isResultsPage = document.getElementById('results').style.display === 'block';
+            const isRetryPage = document.getElementById('retry-results').style.display === 'block';
+            
+            if (submitBtn && submitContainer && window.retryMode) {{
+                // Only show button if all retry questions are answered AND last retry question is answered AND we're not on results/retry pages
+                const shouldShow = allRetryAnswered && lastRetryQuestionAnswered && !isResultsPage && !isRetryPage;
+                
+                if (shouldShow) {{
+                    submitBtn.classList.add('visible');
+                    submitContainer.classList.add('visible');
+                    submitBtn.textContent = 'Submit Retry Quiz';
+                }} else {{
+                    submitBtn.classList.remove('visible');
+                    submitContainer.classList.remove('visible');
+                }}
+            }}
+        }}
+        
         function goToQuestion(questionNum) {{
             showQuestion(questionNum);
         }}
@@ -892,7 +1073,7 @@ class QuizHTMLGenerator:
             }}
             
             currentQuestion = questionNum;
-            updateSquareStates();
+            updateSquareVisuals(); // Only update visual states, not button
         }}
         
         function nextQuestion() {{
@@ -1091,6 +1272,14 @@ class QuizHTMLGenerator:
             document.getElementById('question-squares').style.display = 'none';
             document.getElementById('retry-results').style.display = 'block';
 
+            // Hide submit button when retry results are shown
+            const submitBtn = document.getElementById('submit-quiz-btn');
+            const submitContainer = document.getElementById('submit-quiz-container');
+            if (submitBtn && submitContainer) {{
+                submitBtn.classList.remove('visible');
+                submitContainer.classList.remove('visible');
+            }}
+
             document.getElementById('retry-summary').textContent = `${{retryCorrect}}/${{totalRetried}} correct (Retry)`;
             document.getElementById('retry-message').textContent =
                 remainingCount > 0
@@ -1121,7 +1310,10 @@ class QuizHTMLGenerator:
         function validateQuiz() {{
             const unansweredQuestions = [];
             
-            for (let i = 1; i <= totalQuestions; i++) {{
+            // In retry mode, only validate retry questions
+            const questionsToCheck = window.retryMode ? window.retryQuestions.length : totalQuestions;
+            
+            for (let i = 1; i <= questionsToCheck; i++) {{
                 const question = document.querySelector(`[data-question="${{i}}"]`);
                 const questionType = question.dataset.type;
                 
@@ -1155,17 +1347,92 @@ class QuizHTMLGenerator:
                 
                 // Scroll to first unanswered question
                 if (unansweredQuestions.length > 0) {{
-                    showQuestion(unansweredQuestions[0]);
+                    if (window.retryMode) {{
+                        showRetryQuestion(unansweredQuestions[0]);
+                    }} else {{
+                        showQuestion(unansweredQuestions[0]);
+                    }}
                 }}
                 
                 return false;
             }}
             
-            document.getElementById('unanswered-warning').style.display = 'none';
+            // Hide warning if all questions are answered
+            const warning = document.getElementById('unanswered-warning');
+            if (warning) {{
+                warning.style.display = 'none';
+            }}
+            
+            return true;
+        }}
+        
+        function validateRetryQuiz() {{
+            const unansweredQuestions = [];
+            
+            for (let i = 1; i <= window.retryQuestions.length; i++) {{
+                const originalNum = window.retryQuestions[i - 1];
+                const question = document.querySelector(`[data-question="${{originalNum}}"]`);
+                const questionType = question.dataset.type;
+                
+                let isAnswered = false;
+                
+                if (questionType === 'ordering') {{
+                    const container = document.getElementById(`ordering-${{originalNum}}`);
+                    isAnswered = container && container.classList.contains('completed');
+                }} else if (questionType === 'multiple_answer') {{
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isAnswered = selectedInputs.length > 0;
+                }} else {{
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    isAnswered = !!selectedInput;
+                }}
+                
+                if (!isAnswered) {{
+                    unansweredQuestions.push(i);
+                }}
+            }}
+            
+            if (unansweredQuestions.length > 0) {{
+                // Show warning message instead of alert
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'unanswered-warning';
+                warningDiv.style.display = 'block';
+                warningDiv.innerHTML = `
+                    <strong>⚠️ Please answer all retry questions before submitting!</strong><br>
+                    <span class="unanswered-questions">Unanswered retry questions: ${{unansweredQuestions.join(', ')}}</span>
+                `;
+                
+                // Insert warning at the top of quiz container
+                const quizContainer = document.getElementById('quiz-container');
+                quizContainer.insertBefore(warningDiv, quizContainer.firstChild);
+                
+                // Navigate to first unanswered question
+                if (unansweredQuestions.length > 0) {{
+                    showRetryQuestion(unansweredQuestions[0]);
+                }}
+                
+                // Remove warning after 3 seconds
+                setTimeout(() => {{
+                    if (warningDiv.parentNode) {{
+                        warningDiv.parentNode.removeChild(warningDiv);
+                    }}
+                }}, 3000);
+                
+                return false;
+            }}
+            
             return true;
         }}
         
         function submitQuiz() {{
+            if (window.retryMode) {{
+                submitRetryQuiz(); // Use retry submission in retry mode
+            }} else {{
+                submitNormalQuiz(); // Use normal submission in normal mode
+            }}
+        }}
+        
+        function submitNormalQuiz() {{
             if (!validateQuiz()) {{
                 return;
             }}
@@ -1303,10 +1570,21 @@ class QuizHTMLGenerator:
             document.getElementById('question-squares').style.display = 'none';
             document.getElementById('results').style.display = 'block';
             
+            // Hide submit button when results are shown
+            const submitBtn = document.getElementById('submit-quiz-btn');
+            const submitContainer = document.getElementById('submit-quiz-container');
+            if (submitBtn && submitContainer) {{
+                submitBtn.classList.remove('visible');
+                submitContainer.classList.remove('visible');
+            }}
+            
             document.getElementById('score').className = `score ${{scoreClass}}`;
             document.getElementById('score').textContent = `${{correct}}/${{totalQuestions}} (${{percentage}}%)`;
             document.getElementById('score-message').textContent = message;
             document.getElementById('answer-review').innerHTML = reviewHtml;
+            
+            // Check and display remaining questions
+            checkRemainingQuestions();
         }}
         
         function retryFailedQuestions() {{
@@ -1370,6 +1648,9 @@ class QuizHTMLGenerator:
             
             // Show only the first failed question
             showRetryQuestion(1);
+            
+            // Update submit button visibility for retry mode
+            updateSubmitButton(false); // Hide initially until questions are answered
         }}
         
         function initializeRetryQuestionSquares() {{
@@ -1388,7 +1669,7 @@ class QuizHTMLGenerator:
             updateRetrySquareStates();
         }}
         
-        function updateRetrySquareStates() {{
+        function updateRetrySquareVisuals() {{
             if (!window.retryMode) return;
             
             for (let i = 1; i <= window.retryQuestions.length; i++) {{
@@ -1405,6 +1686,40 @@ class QuizHTMLGenerator:
                     square.classList.add('unanswered');
                 }}
             }}
+        }}
+        
+        function updateRetrySquareStates() {{
+            if (!window.retryMode) return;
+            
+            let allRetryAnswered = true;
+            let lastUnansweredRetryQuestion = 0;
+            
+            for (let i = 1; i <= window.retryQuestions.length; i++) {{
+                const square = document.getElementById(`retry-square-${{i}}`);
+                const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                
+                square.classList.remove('active', 'completed', 'unanswered');
+                
+                if (i === currentRetryQuestion) {{
+                    square.classList.add('active');
+                }} else if (selectedInputs.length > 0) {{
+                    square.classList.add('completed');
+                }} else {{
+                    square.classList.add('unanswered');
+                    allRetryAnswered = false;
+                    lastUnansweredRetryQuestion = i; // Track the last unanswered retry question
+                }}
+            }}
+            
+            // Update submit button visibility for retry mode - only show if all retry questions answered
+            // Don't show button just because we're on the last unanswered retry question
+            const shouldShow = allRetryAnswered;
+            updateRetrySubmitButton(shouldShow, shouldShow);
+        }}
+        
+        function isRetryQuestionAnswered(retryQuestionNum) {{
+            const selectedInputs = document.querySelectorAll(`input[name="q${{retryQuestionNum}}"]:checked`);
+            return selectedInputs.length > 0;
         }}
         
         function showRetryQuestion(retryNum) {{
@@ -1428,7 +1743,7 @@ class QuizHTMLGenerator:
             // Update navigation
             currentRetryQuestion = retryNum;
             updateRetryProgress();
-            updateRetrySquareStates();
+            updateRetrySquareVisuals(); // Only update visual states, not button
         }}
         
         function updateRetryProgress() {{
@@ -1450,6 +1765,57 @@ class QuizHTMLGenerator:
         function generateNewQuestions() {{
             // Ask the local quiz server to generate a fresh quiz that excludes previously used questions
             window.location.href = '/generate';
+        }}
+        
+        function retryQuiz() {{
+            // Reset all used questions and restart the quiz
+            window.location.href = '/reset-quiz';
+        }}
+        
+        async function checkRemainingQuestions() {{
+            try {{
+                const response = await fetch('/api/questions');
+                const status = await response.json();
+                
+                const remainingSection = document.getElementById('remaining-questions');
+                const remainingList = document.getElementById('remaining-questions-list');
+                const remainingMessage = document.getElementById('remaining-questions-message');
+                const generateNewBtn = document.querySelector('button[onclick="generateNewQuestions()"]');
+                
+                if (status.unused_count > 0) {{
+                    remainingSection.style.display = 'block';
+                    remainingList.innerHTML = `
+                        <strong>Total questions in bank:</strong> ${{status.total_questions}}<br>
+                        <strong>Used questions:</strong> ${{status.used_count}}<br>
+                        <strong>Remaining available:</strong> ${{status.unused_count}}
+                    `;
+                    
+                    if (status.unused_count < {len(questions)}) {{
+                        remainingMessage.textContent = `⚠️ Only ${{status.unused_count}} questions remaining for next quiz. Pool will reset after these are used.`;
+                        remainingMessage.style.color = '#856404';
+                    }} else {{
+                        remainingMessage.textContent = '✅ Plenty of questions available for next quiz!';
+                        remainingMessage.style.color = '#155724';
+                    }}
+                    
+                    // Show Generate New Questions button if there are questions available
+                    if (generateNewBtn) {{
+                        generateNewBtn.style.display = 'inline-block';
+                        generateNewBtn.textContent = 'Generate New Questions';
+                    }}
+                }} else {{
+                    remainingSection.style.display = 'none';
+                    
+                    // Hide Generate New Questions button when no questions left
+                    if (generateNewBtn) {{
+                        generateNewBtn.style.display = 'none';
+                    }}
+                }}
+            }} catch (error) {{
+                console.error('Error checking remaining questions:', error);
+                const remainingSection = document.getElementById('remaining-questions');
+                remainingSection.style.display = 'none';
+            }}
         }}
         
         function generateNewQuiz() {{
