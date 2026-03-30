@@ -978,44 +978,27 @@ class FancyGit:
         ai_suggestion = None
         current_model = None
         try:
-            # Get repository state for AI analysis
-            repo_state = self.get_repo_state()
-            
-            # Create mock staged diff for AI analysis without actually staging
-            diff_output = ""
-            staged_files = []
-            
             print(color_info("🔍 Analyzing selected files for AI..."))
             
-            # Generate diff for each selected file as if they were staged
+            # Save current staging state to restore later
+            returncode, current_staged, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
+            originally_staged = current_staged.strip().split('\n') if current_staged.strip() else []
+            
+            # Temporarily stage the selected files for accurate AI analysis
+            temp_staged_files = []
             for file_path in files_to_stage:
-                if file_path == '.':
-                    # Get diff for all unstaged changes
-                    returncode, file_diff, stderr = self.runner.run_git_command(['diff'])
-                    if returncode == 0 and file_diff.strip():
-                        diff_output += file_diff + "\n"
-                        # Parse files from diff
-                        for line in file_diff.split('\n'):
-                            if line.startswith('diff --git a/'):
-                                parsed_file = line.split(' b/', 1)[1] if ' b/' in line else line[13:]
-                                staged_files.append(parsed_file)
-                else:
-                    # Get diff for specific file
-                    returncode, file_diff, stderr = self.runner.run_git_command(['diff', file_path])
-                    if returncode == 0 and file_diff.strip():
-                        diff_output += file_diff + "\n"
-                        staged_files.append(file_path)
+                if file_path != '.':
+                    returncode, _, stderr = self.runner.run_git_command(['add', file_path])
+                    if returncode == 0:
+                        temp_staged_files.append(file_path)
             
-            # Also include already staged files
-            if repo_state.get('staged'):
-                returncode, staged_diff, stderr = self.runner.run_git_command(['diff', '--cached'])
-                if returncode == 0 and staged_diff.strip():
-                    diff_output += staged_diff + "\n"
-                    staged_files.extend(repo_state['staged'])
+            # Now get the real staged diff for AI analysis
+            returncode, diff_output, stderr = self.runner.run_git_command(['diff', '--cached'])
             
-            if diff_output.strip():
-                # Remove duplicates while preserving order
-                staged_files = list(dict.fromkeys(staged_files))
+            if returncode == 0 and diff_output.strip():
+                # Get list of staged files
+                returncode, staged_files_output, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
+                staged_files = staged_files_output.strip().split('\n') if staged_files_output.strip() else []
                 
                 # Prepare context for AI
                 context = {
@@ -1043,7 +1026,12 @@ class FancyGit:
                     print(color_warning("⚠️  AI suggestion failed"))
             else:
                 print(color_warning("⚠️  No changes found for AI analysis"))
-                print(color_info("💡 Tip: The selected files don't have any changes to commit"))
+            
+            # Restore original staging state - unstage temporarily staged files
+            for file_path in temp_staged_files:
+                # Only unstage if it wasn't originally staged
+                if file_path not in originally_staged:
+                    self.runner.run_git_command(['reset', 'HEAD', file_path])
                 
         except Exception as e:
             print(color_warning(f"⚠️  AI suggestion error: {e}"))
