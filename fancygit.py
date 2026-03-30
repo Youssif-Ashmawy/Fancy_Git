@@ -978,42 +978,74 @@ class FancyGit:
         
         # Generate AI suggestion automatically
         ai_suggestion = None
+        current_model = None
         try:
-            # Get repository state and staged changes for AI analysis
+            # Get repository state for AI analysis
             repo_state = self.get_repo_state()
             
-            # Get diff of files that will be staged
+            # Create mock staged diff for AI analysis without actually staging
             diff_output = ""
-            if files_to_stage == ['.']:
-                # Get diff of all unstaged changes
-                returncode, diff_output, stderr = self.runner.run_git_command(['diff'])
-                if returncode != 0:
-                    diff_output = ""
-            else:
-                # Get diff for specific files
-                for file_path in files_to_stage:
-                    returncode, file_diff, stderr = self.runner.run_git_command(['diff', file_path])
-                    if returncode == 0 and file_diff:
+            staged_files = []
+            
+            print(color_info("🔍 Analyzing selected files for AI..."))
+            
+            # Generate diff for each selected file as if they were staged
+            for file_path in files_to_stage:
+                if file_path == '.':
+                    # Get diff for all unstaged changes
+                    returncode, file_diff, stderr = self.runner.run_git_command(['diff'])
+                    if returncode == 0 and file_diff.strip():
                         diff_output += file_diff + "\n"
+                        # Parse files from diff
+                        for line in file_diff.split('\n'):
+                            if line.startswith('diff --git a/'):
+                                parsed_file = line.split(' b/', 1)[1] if ' b/' in line else line[13:]
+                                staged_files.append(parsed_file)
+                else:
+                    # Get diff for specific file
+                    returncode, file_diff, stderr = self.runner.run_git_command(['diff', file_path])
+                    if returncode == 0 and file_diff.strip():
+                        diff_output += file_diff + "\n"
+                        staged_files.append(file_path)
+            
+            # Also include already staged files
+            if repo_state.get('staged'):
+                returncode, staged_diff, stderr = self.runner.run_git_command(['diff', '--cached'])
+                if returncode == 0 and staged_diff.strip():
+                    diff_output += staged_diff + "\n"
+                    staged_files.extend(repo_state['staged'])
             
             if diff_output.strip():
+                # Remove duplicates while preserving order
+                staged_files = list(dict.fromkeys(staged_files))
+                
                 # Prepare context for AI
                 context = {
                     'branch': current_branch,
-                    'staged_files': files_to_stage if files_to_stage != ['.'] else ['all changes'],
+                    'staged_files': staged_files if staged_files else ['selected changes'],
                     'diff': diff_output[:2000]  # Limit diff size for AI processing
                 }
+                
+                # Get current AI model for display
+                current_model = self.ollama.get_current_model()
                 
                 # Generate AI commit message
                 with LoadingContext(animation_type=self.loading_animation_type):
                     ai_suggestion = self.ollama.generate_commit_message(context)
                 
                 if ai_suggestion:
-                    print(color_ai(f"💡 AI Suggestion: '{ai_suggestion}'"))
+                    # Display the AI suggestion in a formatted way
+                    print(color_ai(f"\n🤖 AI Suggestion (using {current_model}):"))
+                    print(color_ai("─" * 40))
+                    for line in ai_suggestion.split('\n'):
+                        if line.strip():
+                            print(color_ai(f"  {line}"))
+                    print(color_ai("─" * 40))
                 else:
                     print(color_warning("⚠️  AI suggestion failed"))
             else:
                 print(color_warning("⚠️  No changes found for AI analysis"))
+                print(color_info("💡 Tip: The selected files don't have any changes to commit"))
                 
         except Exception as e:
             print(color_warning(f"⚠️  AI suggestion error: {e}"))
@@ -1071,8 +1103,10 @@ class FancyGit:
         
         if files_to_stage:
             print(color_info(f"📦 Stage: git add {' '.join(files_to_stage)}"))
+            print(color_info(f"🔍 AI Analysis: Based on mock diff of {len(files_to_stage)} file(s)"))
         else:
             print(color_info("📦 Stage: No files to stage"))
+            print(color_info("🔍 AI Analysis: No files to analyze"))
         
         print(color_info(f"💾 Commit: git commit -m \"{commit_message}\""))
         

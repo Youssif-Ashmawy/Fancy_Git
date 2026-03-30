@@ -6,24 +6,45 @@ import time
 
 
 class OllamaClient:
-    """Client for communicating with local Ollama model for error analysis"""
+    """Client for communicating with local AI models for error analysis and commit generation"""
     
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "codellama"):
         self.base_url = base_url
+        self.preferred_model = model
         self.model = model
         self.timeout = 30
         self.max_retries = 2
+        self.fallback_models = ["llama3.2", "llama3", "mistral"]  # Fallback options
         
     def test_connection(self) -> bool:
-        """Test if Ollama is running and accessible"""
+        """Test if AI service is running and accessible"""
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             return response.status_code == 200
         except requests.exceptions.RequestException:
             return False
     
+    def _ensure_model_available(self) -> bool:
+        """Ensure we have a working model, try fallbacks if needed"""
+        available_models = self.get_available_models()
+        
+        # Try preferred model first (handle version tags)
+        for model in available_models:
+            if model.startswith(self.preferred_model):
+                self.model = model
+                return True
+        
+        # Try fallback models (handle version tags)
+        for fallback_model in self.fallback_models:
+            for model in available_models:
+                if model.startswith(fallback_model):
+                    self.model = model
+                    return True
+        
+        return False
+    
     def get_available_models(self) -> List[str]:
-        """Get list of available Ollama models"""
+        """Get list of available AI models"""
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if response.status_code == 200:
@@ -86,16 +107,20 @@ class OllamaClient:
     
     def generate_commit_message(self, context: Dict) -> str:
         """
-        Generate commit message based on git changes
+        Generate commit message based on git changes using new format
         
         Args:
             context: Dictionary containing branch, staged_files, and diff information
             
         Returns:
-            str: Suggested commit message
+            str: Suggested commit message in feat(scope): summary format with bullet points
         """
         if not context:
-            return "feat: Add new functionality"
+            return "feat: Add new functionality\n- Initial implementation"
+        
+        # Ensure we have a working model
+        if not self._ensure_model_available():
+            return "feat: Add changes\n- Unable to connect to AI service"
         
         # Build commit message prompt
         prompt = self._build_commit_prompt(context)
@@ -107,50 +132,66 @@ class OllamaClient:
                     return response
             except Exception as e:
                 if attempt == self.max_retries:
-                    return f"feat: Add changes to {context.get('branch', 'current')}"
+                    return f"feat: Add changes to {context.get('branch', 'current')}\n- Fallback due to AI error: {str(e)[:50]}"
                 time.sleep(1)  # Brief delay before retry
         
-        return "feat: Update repository"
+        return "feat: Update repository\n- Generic commit message"
     
     def _build_commit_prompt(self, context: Dict) -> str:
-        """Build commit message generation prompt"""
-        prompt = """You are a Git expert. Generate a concise, conventional commit message based on the following changes:
+        """Build commit message generation prompt with new format requirements"""
+        prompt = """You are a Git expert. Generate a commit message based on the following staged changes:
 
 Repository Context:
 - Branch: {branch}
 - Files being committed: {files}
 
-Changes (git diff):
+Staged Changes (git diff --cached):
 {diff}
 
 Requirements:
-1. Use conventional commit format: type(scope): description
-2. Types: feat, fix, docs, style, refactor, test, chore
-3. Keep description under 50 characters
-4. Be specific about what changed
-5. Use imperative mood ("add" not "added")
-6. Focus on the "why" not just "what"
-7. **CRITICAL: Generate only ONE line - no multiple lines, no line breaks**
+1. Use this EXACT format:
+   feat(scope): a short summary
+   - point 1
+   - point 2
+   - point 3
+   (add more bullet points as needed)
+
+2. Format details:
+   - Use conventional commit types: feat, fix, docs, style, refactor, test, chore
+   - scope should be the module/area affected (e.g., auth, api, ui, utils)
+   - summary must be under 50 characters, imperative mood
+   - bullet points should describe specific changes made
+   - each bullet point starts with '- '
+   - be specific about what changed and why
+
+3. Content guidelines:
+   - Focus on staged changes only
+   - Include file summary in bullet points when relevant
+   - Be concise but descriptive
+   - Use technical language appropriate for developers
 
 Examples:
-- feat(auth): add OAuth2 login flow
-- fix(api): resolve null pointer in user service
-- docs(readme): update installation instructions
-- style(ui): fix button alignment
-- refactor(utils): simplify validation logic
-- test(user): add unit tests for registration
-- chore(deps): update dependencies
+feat(auth): add OAuth2 login flow
+- implement OAuth2 provider integration
+- add login form with validation
+- update session management
+- add user profile endpoint
 
-Generate only the commit message, no explanation, no quotes, no backticks, no formatting - just the plain text:""".format(
+fix(api): resolve null pointer in user service
+- add null check for user object
+- update error handling in service layer
+- add unit tests for edge cases
+
+Generate ONLY the commit message in the specified format, no explanation:""".format(
             branch=context.get('branch', 'main'),
             files=', '.join(context.get('staged_files', ['files'])),
-            diff=context.get('diff', 'No diff available')[:1500]  # Limit for processing
+            diff=context.get('diff', 'No diff available')[:2000]  # Limit for processing
         )
         
         return prompt
     
     def _call_ollama(self, prompt: str) -> Optional[str]:
-        """Make API call to Ollama"""
+        """Make API call to AI service"""
         try:
             payload = {
                 "model": self.model,
@@ -159,7 +200,7 @@ Generate only the commit message, no explanation, no quotes, no backticks, no fo
                 "options": {
                     "temperature": 0.3,
                     "top_p": 0.9,
-                    "max_tokens": 500
+                    "max_tokens": 800  # Increased for multi-line responses
                 }
             }
             
@@ -175,29 +216,59 @@ Generate only the commit message, no explanation, no quotes, no backticks, no fo
                 # Remove any surrounding quotes/backticks from AI response
                 if (response_text.startswith('"') and response_text.endswith('"')) or \
                    (response_text.startswith("'") and response_text.endswith("'")) or \
-                   (response_text.startswith("`") and response_text.endswith("`")):
+                   (response_text.startswith('`') and response_text.endswith('`')):
                     response_text = response_text[1:-1].strip()
                 
-                # Ensure only first line is used (in case AI generates multiple lines)
-                response_text = response_text.split('\n')[0].strip()
+                # For new format, keep the full multi-line response
+                # But ensure it follows our expected format
+                response_text = response_text.replace('``', '').strip()  # Remove any double backticks
+                
+                lines = response_text.split('\n')
+                # Clean up each line
+                lines = [line.strip() for line in lines if line.strip()]
+                
+                if len(lines) >= 1:
+                    # First line should be the summary
+                    summary_line = lines[0]
+                    # Remove any surrounding formatting
+                    summary_line = summary_line.strip('`"\'')
+                    
+                    bullet_lines = []
+                    for line in lines[1:]:
+                        line = line.strip()
+                        if line and not line.startswith('#'):  # Skip comment lines
+                            # Remove any surrounding formatting
+                            line = line.strip('`"\'')
+                            if not line.startswith('- '):
+                                line = '- ' + line  # Ensure bullet format
+                            bullet_lines.append(line)
+                    
+                    if bullet_lines:
+                        response_text = summary_line + '\n' + '\n'.join(bullet_lines)
+                    else:
+                        response_text = summary_line + '\n- Implementation changes'
+                else:
+                    # If no valid content, create a default
+                    response_text = "feat: Update repository\n- Implementation changes"
                 
                 return response_text
             else:
-                raise Exception(f"Ollama API returned status {response.status_code}")
+                raise Exception(f"AI API returned status {response.status_code}")
                 
         except requests.exceptions.Timeout:
-            raise Exception("Request to Ollama timed out")
+            raise Exception("Request to AI service timed out")
         except requests.exceptions.ConnectionError:
-            raise Exception("Cannot connect to Ollama. Make sure it's running.")
+            raise Exception("Cannot connect to AI service. Make sure it's running.")
         except json.JSONDecodeError:
-            raise Exception("Invalid response from Ollama")
+            raise Exception("Invalid response from AI service")
         except Exception as e:
-            raise Exception(f"Error calling Ollama: {str(e)}")
+            raise Exception(f"Error calling AI service: {str(e)}")
     
     def set_model(self, model: str) -> bool:
         """Change the model being used"""
         available_models = self.get_available_models()
         if model in available_models:
+            self.preferred_model = model
             self.model = model
             return True
         return False
@@ -215,3 +286,7 @@ Generate only the commit message, no explanation, no quotes, no backticks, no fo
             return {}
         except requests.exceptions.RequestException:
             return {}
+    
+    def get_current_model(self) -> str:
+        """Get the currently active model name"""
+        return self.model
