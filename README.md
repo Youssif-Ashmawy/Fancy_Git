@@ -106,6 +106,48 @@ fancygit insights [--days=N] [--format=console|json] [--output=filename]
 fancygit visualize [directory] [--max-commits=N] [--no-open]
 ```
 
+#### **🚀 Complete Push Workflow**
+```bash
+# Interactive complete push workflow (pull → stage → commit → push)
+fancygit complete-push
+
+# With specific files
+fancygit complete-push file1.py file2.py
+
+# Skip pull or push
+fancygit complete-push --no-pull --no-push
+
+# With custom commit message (still asks for confirmation)
+fancygit complete-push --message="Fix bug"
+
+# With AI commit message suggestions (automatically generated, Press Enter to use)
+fancygit complete-push
+```
+
+**Complete Push Features:**
+- **Branch Selection**: Shows current branch and allows switching before operations
+- **Interactive File Selection**: Displays available files with status (staged/modified/untracked)
+- **Smart Defaults**: Press Enter for all files, stay on current branch
+- **AI Commit Suggestions**: Automatically generated AI commit messages (Press Enter to use, requires Ollama)
+- **Dry Run Preview**: Shows all planned operations before execution
+- **User Confirmation**: Must confirm before any git operations run
+- **Continuous Commit Message Prompt**: Re-asks until non-empty message provided
+
+**AI Commit Message Features:**
+- **Context-Aware**: Analyzes git diff and repository state
+- **Conventional Commits**: Follows feat/fix/docs/style/refactor/test/chore format
+- **Smart Suggestions**: Based on actual changes being committed
+- **Optional**: Can accept or reject AI suggestions
+- **Fallback**: Works even if AI is unavailable
+
+**Workflow Steps:**
+1. 🌿 Select/confirm branch
+2. 📋 Choose files to stage (interactive)
+3. 📝 Enter commit message (required)
+4. 🔍 Review dry run of all operations
+5. ❓ Confirm execution
+6. 🚀 Execute: pull → add → commit → push
+
 ### How It Works
 
 1. **Command Execution**: Runs the actual git command

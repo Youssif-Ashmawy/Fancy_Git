@@ -2,8 +2,14 @@
 import subprocess
 import re
 import sys
+import signal
 import os
 import webbrowser
+import json
+import random
+import threading
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from prompt_toolkit import prompt
 
 # Handle both direct execution and module import
 try:
@@ -17,7 +23,7 @@ try:
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
-    from src.config_manager import ConfigManager
+    from src.quiz_manager import QuizManager
     from welcome import show_welcome
 except ImportError:
     # When installed as a module, add the current directory to path
@@ -34,7 +40,7 @@ except ImportError:
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
-    from src.config_manager import ConfigManager
+    from src.quiz_manager import QuizManager
     from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -64,48 +70,9 @@ class FancyGit:
         # self.ollama = OllamaClient()
         self.output_colorizer = OutputColorizer()
         self.config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.fancygit_config')
-        self.ai_engine = AIEngine(self.config_manager)
-        self.available_commands = self._load_commands()
         
-    @property
-    def confirmation_enabled(self):
-        """Get confirmation enabled state from config manager"""
-        return self.config_manager.config.confirmation_enabled
-    
-    @confirmation_enabled.setter
-    def confirmation_enabled(self, value):
-        """Set confirmation enabled state in config manager"""
-        self.config_manager.config.confirmation_enabled = value
-    
-    @property
-    def ai_analysis_enabled(self):
-        """Get AI analysis enabled state from config manager"""
-        return self.config_manager.config.ai_analysis_enabled
-    
-    @ai_analysis_enabled.setter
-    def ai_analysis_enabled(self, value):
-        """Set AI analysis enabled state in config manager"""
-        self.config_manager.config.ai_analysis_enabled = value
-    
-    @property
-    def output_coloring_enabled(self):
-        """Get output coloring enabled state from config manager"""
-        return self.config_manager.config.output_coloring_enabled
-    
-    @output_coloring_enabled.setter
-    def output_coloring_enabled(self, value):
-        """Set output coloring enabled state in config manager"""
-        self.config_manager.config.output_coloring_enabled = value
-    
-    @property
-    def loading_animation_type(self):
-        """Get loading animation type from config manager"""
-        return self.config_manager.config.loading_animation
-    
-    @loading_animation_type.setter
-    def loading_animation_type(self, value):
-        """Set loading animation type in config manager"""
-        self.config_manager.config.loading_animation = value
+        # Initialize quiz manager
+        self.quiz_manager = QuizManager()
     
     def _load_commands(self):
         """Dynamically load commands from command-list.txt file"""
@@ -465,6 +432,18 @@ class FancyGit:
             else:
                 return self.toggle_output_coloring()
 
+        # Handle ship command
+        if command == 'ship':
+            return self.ship(*args)
+
+        # Handle undo command
+        if command == 'undo':
+            return self.undo(*args)
+
+        # Handle redo command
+        if command == 'redo':
+            return self.redo(*args)
+
         # Handle insights command
         if command == 'insights':
             days = 30  # default
@@ -581,6 +560,28 @@ class FancyGit:
                 print(color_error(f"Failed to visualize repo: {e}"))
                 return False
         
+        # Handle quiz command
+        if command == 'quiz':
+            import subprocess
+            import sys
+            script_dir = os.path.dirname(os.path.realpath(__file__))
+            quiz_server_script = os.path.join(script_dir, 'quiz_server.py')
+            
+            try:
+                # Execute quiz_server.py script and handle KeyboardInterrupt gracefully
+                result = subprocess.run([sys.executable, quiz_server_script], check=False)
+                return result.returncode == 0
+            except KeyboardInterrupt:
+                # User pressed Ctrl+C, this is normal behavior
+                print(color_info("\n🛑 Quiz server stopped by user"))
+                return True
+            except FileNotFoundError:
+                print(color_error("❌ quiz_server.py not found"))
+                return False
+            except Exception as e:
+                print(color_error(f"❌ Failed to start quiz server: {e}"))
+                return False
+        
         return self._command_handler(command, *args)
  
     # REFACTORED
@@ -654,16 +655,17 @@ class FancyGit:
                     
                     if error_data:
                         # Start loading animation during AI analysis
-                        with LoadingContext(animation_type=self.config_manager.config.loading_animation):
-                            ai_analysis = self.ai_engine.analyze_error_messages(error_data)
-                        
-                        if ai_analysis:
-                            print(color_ai("\n🧠 AI Analysis & Suggestions:"))
-                            print(Colors.divider("-", 40))
-                            print(color_ai(ai_analysis))
-                            print(Colors.divider("-", 40))
-                        else:
-                            print(color_warning("⚠️  AI analysis failed"))
+                        try:
+                            with LoadingContext(animation_type=self.loading_animation_type):
+                                ai_analysis = self.ollama.analyze_error_messages(error_data)
+                            
+                            if ai_analysis:
+                                print(color_ai("🧠 AI:"))
+                                print(color_ai(ai_analysis))
+                            else:
+                                print(color_warning("⚠️  AI analysis failed"))
+                        except KeyboardInterrupt:
+                            print(color_warning("\n\n⚠️  AI analysis cancelled by user"))
                     else:
                         print(color_warning("⚠️  No valid error data for AI analysis"))
                 except Exception as e:
@@ -703,8 +705,8 @@ class FancyGit:
         if returncode == 0 and stdout:
             repo_state['branch'] = stdout.strip()
         
-        # Get porcelain status for parsing
-        returncode, stdout, stderr = self.runner.run_git_command(['status', '--porcelain'])
+        # Get porcelain status for parsing (excluding ignored files)
+        returncode, stdout, stderr = self.runner.run_git_command(['status', '--porcelain', '--ignored'])
         if returncode == 0 and stdout:
             for line in stdout.strip().split('\n'):
                 if line.strip():
@@ -715,10 +717,13 @@ class FancyGit:
                         repo_state['conflicts'].append(file_path)
                     elif status[0] in ['A', 'M', 'D', 'R', 'C']:
                         repo_state['staged'].append(file_path)
-                    elif status[1] in ['M', 'D']:
+                    elif status[1] in ['M', 'D'] or status[0] == 'M':
                         repo_state['modified'].append(file_path)
                     elif status == '??':
                         repo_state['untracked'].append(file_path)
+                    # Skip ignored files (status starts with '!!')
+                    elif status == '!!':
+                        continue
         
         # Check if working directory is clean
         repo_state['clean'] = (not repo_state['staged'] and 
@@ -883,19 +888,800 @@ class FancyGit:
         
         return conflicts
 
+    def ship(self, *args):
+        """Ship command that pulls changes, stages files, commits, and pushes
+        
+        Usage: ship [files...] [--all] [--message="commit message"] [--no-pull] [--no-push]
+        
+        Args:
+            files: Specific files to stage (optional)
+            --all: Stage all changes (default if no files specified)
+            --message: Custom commit message (if not provided, will prompt interactively)
+            --no-pull: Skip pulling changes before committing
+            --no-push: Skip pushing after committing
+        """
+        # Parse arguments
+        files_to_stage = []
+        commit_message = None
+        pull_changes = True
+        push_changes = True
+        
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg == '--all':
+                files_to_stage = ['.']  # Stage all changes
+            elif arg.startswith('--message='):
+                commit_message = arg.split('=', 1)[1]
+            elif arg == '--no-pull':
+                pull_changes = False
+            elif arg == '--no-push':
+                push_changes = False
+            elif arg == '--help':
+                print(color_header("Ship Command"))
+                print(color_info("Usage: ship [files...] [--all] [--message=\"commit message\"] [--no-pull] [--no-push]"))
+                print("")
+                print(color_info("Options:"))
+                print("  files...       : Specific files to stage")
+                print("  --all          : Stage all changes (default if no files specified)")
+                print("  --message=... : Custom commit message")
+                print("  --no-pull      : Skip pulling changes before committing")
+                print("  --no-push      : Skip pushing after committing")
+                print("  --help         : Show this help")
+                print("")
+                print(color_info("Examples:"))
+                print("  ship                           # Interactive mode with all changes")
+                print("  ship file1.py file2.py         # Stage specific files")
+                print("  ship --all --message=\"Fix bug\" # Stage all with custom message")
+                print("  ship --no-pull                 # Skip pulling changes")
+                return True
+            elif not arg.startswith('--'):
+                files_to_stage.append(arg)
+            i += 1
+        
+        # If no files specified, default to all changes
+        if not files_to_stage:
+            files_to_stage = ['.']
+        
+        print(color_header("🚀 Ship Workflow"))
+        print(Colors.divider("=", 40))
+        
+        # Step 0: Branch selection
+        print(color_info("🌿 Checking current branch..."))
+        repo_state = self.get_repo_state()
+        current_branch = repo_state.get('branch', 'unknown')
+        
+        print(color_info(f"Current branch: {color_branch(current_branch)}"))
+        change_branch = input(color_info("Change branch? [Press Enter to keep current, or enter branch name]: ")).strip()
+        
+        if change_branch:
+            # Switch to specified branch
+            print(color_info(f"🔄 Switching to branch: {color_branch(change_branch)}"))
+            returncode, stdout, stderr = self.runner.run_git_command(['checkout', change_branch])
+            if returncode == 0:
+                print(color_success(f"✅ Switched to branch: {change_branch}"))
+                current_branch = change_branch
+            else:
+                print(color_error(f"❌ Failed to switch to branch: {change_branch}"))
+                if stderr:
+                    print(stderr.strip())
+                return False
+        else:
+            print(color_success(f"✅ Staying on branch: {color_branch(current_branch)}"))
+        
+        # Step 0.5: Determine files to stage (show in dry run)
+        # Check if specific files were provided in command line arguments
+        specific_files_provided = any(arg and not arg.startswith('--') for arg in args)
+        
+        # If no specific files provided, show interactive file selection in dry run
+        if not specific_files_provided:
+            print(color_info("📋 Checking repository status..."))
+            repo_state = self.get_repo_state()
+            
+            # Collect all available files
+            available_files = []
+            if repo_state['staged']:
+                available_files.extend([('staged', f) for f in repo_state['staged']])
+            if repo_state['modified']:
+                available_files.extend([('modified', f) for f in repo_state['modified']])
+            if repo_state['untracked']:
+                available_files.extend([('untracked', f) for f in repo_state['untracked']])
+            
+            if available_files:
+                print(color_header("\n📁 Available files to stage:"))
+                for idx, (status, file_path) in enumerate(available_files, 1):
+                    status_icon = {
+                        'staged': '✅',
+                        'modified': '📝', 
+                        'untracked': '❓'
+                    }.get(status, '📄')
+                    print(f"  {idx:2d}. {status_icon} {color_file(file_path)} ({status})")
+                
+                print(color_info("\nSelect files to stage (Press Enter for all files, or enter numbers like 1,3,5 or 1-5 or 'staged' or 'modified' or 'untracked'):"))
+                selection = input(color_info("Your choice: ")).strip()
+                
+                selected_files = []
+                # Default to all files if empty input
+                if not selection:
+                    selected_files = [f for _, f in available_files]
+                    print(color_success("✅ Selected all files"))
+                elif selection == 'all':
+                    selected_files = [f for _, f in available_files]
+                elif selection in ['staged', 'modified', 'untracked']:
+                    selected_files = [f for status, f in available_files if status == selection]
+                else:
+                    # Parse comma-separated numbers and ranges
+                    try:
+                        indices = []
+                        for part in selection.split(','):
+                            part = part.strip()
+                            if '-' in part:
+                                start, end = map(int, part.split('-'))
+                                indices.extend(range(start, end + 1))
+                            else:
+                                indices.append(int(part))
+                        
+                        for idx in indices:
+                            if 1 <= idx <= len(available_files):
+                                selected_files.append(available_files[idx - 1][1])
+                            else:
+                                print(color_warning(f"Invalid index: {idx}"))
+                    except ValueError:
+                        print(color_error("Invalid selection format"))
+                        return False
+                
+                files_to_stage = selected_files if selected_files else ['.']
+            else:
+                print(color_warning("No changes to stage"))
+                return False
+        
+        # Step 1: Get commit message for dry run (with AI auto-suggestion)
+        print(color_info("\n📝 Generating AI commit message suggestion..."))
+        
+        # Generate AI suggestion automatically
+        ai_suggestion = None
+        current_model = None
+        try:
+            print(color_info("🔍 Analyzing selected files for AI..."))
+            
+            # Save current staging state to restore later
+            returncode, current_staged, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
+            originally_staged = current_staged.strip().split('\n') if current_staged.strip() else []
+            
+            # Store cleanup function for signal handling
+            temp_staged_files = []
+            
+            def cleanup_temp_staging():
+                """Clean up temporarily staged files"""
+                for file_path in temp_staged_files:
+                    # Only unstage if it wasn't originally staged
+                    if file_path not in originally_staged:
+                        try:
+                            self.runner.run_git_command(['reset', 'HEAD', file_path])
+                        except:
+                            pass  # Ignore cleanup errors
+            
+            def signal_handler(signum, frame):
+                """Handle Ctrl+C signal"""
+                print(color_warning("\n\n⚠️  Interrupted! Cleaning up temporary staging..."))
+                cleanup_temp_staging()
+                sys.exit(1)
+            
+            # Set up signal handler for Ctrl+C
+            original_signal = signal.signal(signal.SIGINT, signal_handler)
+            
+            try:
+                # Temporarily stage the selected files for accurate AI analysis
+                for file_path in files_to_stage:
+                    if file_path != '.':
+                        returncode, _, stderr = self.runner.run_git_command(['add', file_path])
+                        if returncode == 0:
+                            temp_staged_files.append(file_path)
+                
+                # Now get the real staged diff for AI analysis (only new changes since last commit)
+                returncode, diff_output, stderr = self.runner.run_git_command(['diff', '--cached', 'HEAD~1'])
+                
+                if returncode == 0 and diff_output.strip():
+                    # Get list of staged files
+                    returncode, staged_files_output, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
+                    staged_files = staged_files_output.strip().split('\n') if staged_files_output.strip() else []
+                    
+                    # Prepare context for AI
+                    context = {
+                        'branch': current_branch,
+                        'staged_files': staged_files if staged_files else ['selected changes'],
+                        'diff': diff_output[:2000]  # Limit diff size for AI processing
+                    }
+                    
+                    # Get current AI model for display
+                    current_model = self.ollama.get_current_model()
+                    
+                    # Generate AI commit message
+                    try:
+                        with LoadingContext(animation_type=self.loading_animation_type):
+                            ai_suggestion = self.ollama.generate_commit_message(context)
+                    except KeyboardInterrupt:
+                        print(color_warning("\n\n⚠️  AI generation cancelled by user"))
+                        ai_suggestion = None
+                    
+                    if ai_suggestion:
+                        # Display the AI suggestion in a formatted way
+                        print(color_ai(f"\n🤖 AI Suggestion (using {current_model}):"))
+                        print(color_ai("─" * 40))
+                        for line in ai_suggestion.split('\n'):
+                            if line.strip():
+                                print(color_ai(f"  {line}"))
+                        print(color_ai("─" * 40))
+                    else:
+                        print(color_warning("⚠️  AI suggestion failed"))
+                else:
+                    print(color_warning("⚠️  No changes found for AI analysis"))
+                
+                # Restore original staging state - unstage temporarily staged files
+                cleanup_temp_staging()
+                
+            finally:
+                # Restore original signal handler
+                signal.signal(signal.SIGINT, original_signal)
+                
+        except Exception as e:
+            print(color_warning(f"⚠️  AI suggestion error: {e}"))
+        
+        # Now get user input with three options
+        while True:
+            if ai_suggestion:
+                print(color_info("\nChoose an option:"))
+                print(color_info("  1. Press Enter to use AI suggestion"))
+                print(color_info("  2. Type your own commit message"))
+                print(color_info("  3. Type 'm' to modify AI suggestion"))
+                
+                user_input = input(color_info("Your choice: ")).strip()
+                
+                if not user_input:
+                    # Option 1: Use AI suggestion
+                    commit_message = ai_suggestion
+                    print(color_success(f"✅ Using AI suggestion: '{commit_message}'"))
+                    break
+                elif user_input.lower() == 'm':
+                    # Option 3: Modify AI suggestion (like pressing up arrow)
+                    commit_message = prompt(
+                        "Modified commit message: ",
+                        default=ai_suggestion
+                    ).strip()
+                    
+                    if not commit_message:
+                        commit_message = ai_suggestion
+                        print(color_success(f"✅ Using original AI suggestion: '{commit_message}'"))
+                    else:
+                        print(color_success(f"✅ Using modified message: '{commit_message}'"))
+                    break
+                else:
+                    # Option 2: User's own message
+                    commit_message = user_input
+                    print(color_success(f"✅ Using custom message: '{commit_message}'"))
+                    break
+            else:
+                # No AI suggestion available, just ask for input
+                commit_message = input(color_info("📝 Enter commit message: ")).strip()
+                if commit_message:
+                    break
+                else:
+                    print(color_warning("⚠️  Commit message cannot be empty. Please try again."))
+        
+        # Step 2: Dry Run - Show planned operations
+        print(color_header("\n🔍 DRY RUN - Planned Operations"))
+        print(Colors.divider("-", 50))
+        
+        print(color_info(f"🌿 Branch: {color_branch(current_branch)}"))
+        if pull_changes:
+            print(color_info("📥 Pull: git pull"))
+        else:
+            print(color_info("⏭️  Pull: SKIPPED"))
+        
+        if files_to_stage:
+            print(color_info(f"📦 Stage: git add {' '.join(files_to_stage)}"))
+            print(color_info(f"🔍 AI Analysis: Based on mock diff of {len(files_to_stage)} file(s)"))
+        else:
+            print(color_info("📦 Stage: No files to stage"))
+            print(color_info("🔍 AI Analysis: No files to analyze"))
+        
+        print(color_info(f"💾 Commit: git commit -m \"{commit_message}\""))
+        
+        if push_changes:
+            print(color_info("📤 Push: git push"))
+        else:
+            print(color_info("⏭️  Push: SKIPPED"))
+        
+        print(Colors.divider("-", 50))
+        
+        # Step 3: Confirmation
+        print(color_info("\n❓ Do you want to execute these operations?"))
+        confirmation = input(color_info("[y/N]: ")).strip().lower()
+        
+        if confirmation not in ['y', 'yes']:
+            print(color_warning("❌ Operation cancelled by user"))
+            return False
+        
+        print(color_success("✅ Confirmed! Executing operations..."))
+        print(Colors.divider("=", 40))
+        
+        # Step 4: Pull changes if enabled
+        if pull_changes:
+            print(color_info("📥 Pulling latest changes..."))
+            returncode, stdout, stderr = self.runner.run_git_command(['pull'])
+            if returncode == 0:
+                print(color_success("✅ Pull completed successfully"))
+                if stdout:
+                    print(stdout.strip())
+            else:
+                print(color_warning("⚠️  Pull had issues, but continuing..."))
+                if stderr:
+                    print(stderr.strip())
+        else:
+            print(color_info("⏭️  Skipping pull changes"))
+        
+        # Step 5: Stage files
+        print(color_info(f"\n📦 Staging files: {', '.join(files_to_stage)}"))
+        returncode, stdout, stderr = self.runner.run_git_command(['add'] + files_to_stage)
+        if returncode == 0:
+            print(color_success("✅ Files staged successfully"))
+        else:
+            print(color_error("❌ Failed to stage files"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        # Step 6: Commit changes
+        print(color_info(f"\n💾 Committing with message: '{commit_message}'"))
+        returncode, stdout, stderr = self.runner.run_git_command(['commit', '-m', commit_message])
+        if returncode == 0:
+            print(color_success("✅ Changes committed successfully"))
+            if stdout:
+                print(stdout.strip())
+        else:
+            print(color_error("❌ Failed to commit changes"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        # Step 7: Push changes if enabled
+        if push_changes:
+            print(color_info("\n📤 Pushing changes..."))
+            returncode, stdout, stderr = self.runner.run_git_command(['push'])
+            if returncode == 0:
+                print(color_success("✅ Changes pushed successfully"))
+                if stdout:
+                    print(stdout.strip())
+            else:
+                print(color_warning("⚠️  Push had issues"))
+                if stderr:
+                    print(stderr.strip())
+        else:
+            print(color_info("⏭️  Skipping push"))
+        
+        print(Colors.divider("=", 40))
+        print(color_success("🎉 Complete push workflow completed!"))
+        return True
+
+    def undo(self, *args):
+        """Undo command that reverts to the previous state before the latest commit
+        
+        Usage: undo [--soft] [--mixed] [--hard] [--help]
+        
+        Args:
+            --soft:   Keep changes staged (git reset --soft HEAD~1)
+            --mixed:  Unstage changes but keep them in working directory (git reset --mixed HEAD~1) - default
+            --hard:   Discard all changes (git reset --hard HEAD~1)
+            --help:   Show this help
+        """
+        # Parse arguments
+        reset_type = '--mixed'  # default
+        show_help = False
+        
+        for arg in args:
+            if arg in ['--soft', '--mixed', '--hard']:
+                reset_type = arg
+            elif arg == '--help':
+                show_help = True
+        
+        if show_help:
+            print(color_header("Undo Command"))
+            print(color_info("Usage: undo [--soft|--mixed|--hard]"))
+            print("")
+            print(color_info("Options:"))
+            print("  --soft   : Keep changes staged (reset --soft HEAD~1)")
+            print("  --mixed  : Unstage changes but keep them in working directory (reset --mixed HEAD~1) - default")
+            print("  --hard   : Discard all changes (reset --hard HEAD~1)")
+            print("  --help   : Show this help")
+            print("")
+            print(color_info("Examples:"))
+            print("  undo           # Reset with --mixed (default)")
+            print("  undo --soft    # Keep changes staged")
+            print("  undo --hard    # Discard all changes")
+            return True
+        
+        print(color_header("↩️  Undo Command"))
+        print(Colors.divider("=", 40))
+        
+        # Check if we're in a git repository
+        returncode, stdout, stderr = self.runner.run_git_command(['rev-parse', '--git-dir'])
+        if returncode != 0:
+            print(color_error("❌ Not in a git repository"))
+            return False
+        
+        # Get current commit info
+        returncode, stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '2'])
+        if returncode != 0:
+            print(color_error("❌ Failed to get commit history"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        commits = stdout.strip().split('\n')
+        if len(commits) < 2:
+            print(color_warning("⚠️  No previous commit to undo to"))
+            print(color_info("Current commit is the only commit in the repository"))
+            return False
+        
+        current_commit = commits[0]
+        previous_commit = commits[1]
+        
+        print(color_info("Current commit history:"))
+        print(f"  HEAD:     {color_success(current_commit)}")
+        print(f"  Previous: {color_info(previous_commit)}")
+        
+        # Show what will be reset based on reset type
+        reset_descriptions = {
+            '--soft': 'Keep changes staged',
+            '--mixed': 'Unstage changes but keep them in working directory',
+            '--hard': 'Discard all changes'
+        }
+        
+        print(color_info(f"\nReset type: {color_success(reset_type)}"))
+        print(color_info(f"Action: {reset_descriptions[reset_type]}"))
+        
+        # Get repository state before reset for warning
+        repo_state = self.get_repo_state()
+        has_staged = bool(repo_state['staged'])
+        has_modified = bool(repo_state['modified'])
+        has_untracked = bool(repo_state['untracked'])
+        
+        if reset_type == '--hard' and (has_staged or has_modified or has_untracked):
+            print(color_warning("\n⚠️  WARNING: --hard reset will discard:"))
+            if has_staged:
+                print(f"  • Staged changes: {len(repo_state['staged'])} files")
+            if has_modified:
+                print(f"  • Modified files: {len(repo_state['modified'])} files")
+            if has_untracked:
+                print(f"  • Untracked files: {len(repo_state['untracked'])} files")
+        
+        # Confirmation
+        if self.confirmation_enabled:
+            response = input(color_info(f"\nReset to previous commit with {reset_type}? [y/N]: ")).strip().lower()
+            if response not in ['y', 'yes']:
+                print(color_warning("❌ Undo operation cancelled"))
+                return False
+        
+        # Execute the reset
+        print(color_info(f"\n🔄 Resetting to previous commit ({reset_type})..."))
+        returncode, stdout, stderr = self.runner.run_git_command(['reset', reset_type, 'HEAD~1'])
+        
+        if returncode == 0:
+            print(color_success("✅ Successfully reset to previous commit"))
+            
+            # Show new state
+            print(color_info("\n📋 New repository state:"))
+            returncode, new_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+            if returncode == 0:
+                print(f"  Current HEAD: {color_success(new_stdout.strip())}")
+            
+            # Show working directory status
+            new_repo_state = self.get_repo_state()
+            if new_repo_state['staged']:
+                print(f"  Staged files: {len(new_repo_state['staged'])}")
+            if new_repo_state['modified']:
+                print(f"  Modified files: {len(new_repo_state['modified'])}")
+            if new_repo_state['untracked']:
+                print(f"  Untracked files: {len(new_repo_state['untracked'])}")
+            
+            if new_repo_state['clean']:
+                print(color_success("  Working directory is clean"))
+            
+            return True
+        else:
+            print(color_error("❌ Failed to reset to previous commit"))
+            if stderr:
+                print(stderr.strip())
+            return False
+
+    def redo(self, *args):
+        """Redo command that restores commits that were undone using the undo command
+        
+        Usage: redo [--help]
+        
+        This command uses git reflog to find and restore the most recent commit
+        that was moved away from by a reset operation.
+        """
+        # Parse arguments
+        show_help = False
+        
+        for arg in args:
+            if arg == '--help':
+                show_help = True
+        
+        if show_help:
+            print(color_header("Redo Command"))
+            print(color_info("Usage: redo"))
+            print("")
+            print(color_info("Options:"))
+            print("  --help   : Show this help")
+            print("")
+            print(color_info("Description:"))
+            print("  Restores the most recent commit that was undone using 'undo'")
+            print("  Uses git reflog to find and re-apply the reset commit")
+            print("")
+            print(color_info("Examples:"))
+            print("  redo           # Redo the last undo operation")
+            return True
+        
+        print(color_header("↪️  Redo Command"))
+        print(Colors.divider("=", 40))
+        
+        # Check if we're in a git repository
+        returncode, stdout, stderr = self.runner.run_git_command(['rev-parse', '--git-dir'])
+        if returncode != 0:
+            print(color_error("❌ Not in a git repository"))
+            return False
+        
+        # Get reflog to find the most recent reset operation
+        returncode, stdout, stderr = self.runner.run_git_command(['reflog', '--oneline', '-n', '10'])
+        if returncode != 0:
+            print(color_error("❌ Failed to get reflog"))
+            if stderr:
+                print(stderr.strip())
+            return False
+        
+        reflog_entries = stdout.strip().split('\n')
+        if not reflog_entries or not stdout.strip():
+            print(color_error("❌ No reflog entries found"))
+            return False
+        
+        # Find the most recent reset operation and get the commit that was moved to (the newer commit)
+        target_commit = None
+        for i, entry in enumerate(reflog_entries):
+            if 'reset: moving to HEAD~1' in entry:
+                # The commit that was reset FROM (the newer commit we want to redo to) 
+                # is in the reflog entry right before the reset operation
+                if i > 0:
+                    prev_entry = reflog_entries[i - 1]
+                    # Extract commit hash from the previous entry
+                    parts = prev_entry.split()
+                    if len(parts) >= 1:
+                        commit_hash = parts[0]
+                        # Verify this is a valid commit hash
+                        returncode, _, _ = self.runner.run_git_command(['cat-file', '-t', commit_hash])
+                        if returncode == 0:
+                            target_commit = commit_hash
+                            break
+        if not target_commit:
+            print(color_error("❌ Could not determine target commit"))
+            return False
+        
+        # Get current and target commit info for display
+        returncode, current_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+        returncode, target_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1', target_commit])
+        
+        # Extract current HEAD commit hash for comparison
+        current_commit = None
+        if current_stdout:
+            current_parts = current_stdout.strip().split()
+            if len(current_parts) >= 1:
+                current_commit = current_parts[0]
+        
+        # Check if we're already at the target commit
+        if current_commit and current_commit.startswith(target_commit[:8]):
+            print(color_success("✅ Already at the most recent commit"))
+            print(color_info("Current state:"))
+            if current_stdout:
+                print(f"  HEAD: {color_success(current_stdout.strip())}")
+            print(color_info("No redo needed - this is already the latest commit"))
+            return True
+        
+        print(color_info("Current state:"))
+        if current_stdout:
+            print(f"  HEAD: {color_info(current_stdout.strip())}")
+        
+        print(color_info("Will restore to:"))
+        if target_stdout:
+            print(f"  Commit: {color_success(target_stdout.strip())}")
+        
+        # Get repository state before redo for warning
+        repo_state = self.get_repo_state()
+        has_staged = bool(repo_state['staged'])
+        has_modified = bool(repo_state['modified'])
+        has_untracked = bool(repo_state['untracked'])
+        
+        if has_staged or has_modified or has_untracked:
+            print(color_warning("\n⚠️  WARNING: Redo will affect current working directory:"))
+            if has_staged:
+                print(f"  • Staged changes: {len(repo_state['staged'])} files")
+            if has_modified:
+                print(f"  • Modified files: {len(repo_state['modified'])} files")
+            if has_untracked:
+                print(f"  • Untracked files: {len(repo_state['untracked'])} files")
+        
+        # Confirmation
+        if self.confirmation_enabled:
+            response = input(color_info(f"\nRestore commit {target_commit[:8]}? [y/N]: ")).strip().lower()
+            if response not in ['y', 'yes']:
+                print(color_warning("❌ Redo operation cancelled"))
+                return False
+        
+        # Execute the redo using cherry-pick
+        print(color_info(f"\n🔄 Restoring commit {target_commit[:8]}..."))
+        returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+        
+        if returncode != 0:
+            # Check if this is a conflict due to local changes or merge conflicts
+            if ("would be overwritten by merge" in stderr or 
+                "Your local changes" in stderr or
+                "could not apply" in stderr or
+                "merge conflict" in stderr.lower() or
+                returncode == 1):  # git cherry-pick returns 1 for conflicts
+                print(color_warning("⚠️  Conflict detected during redo operation"))
+                
+                # First abort any in-progress cherry-pick to clean up
+                abort_returncode, abort_stdout, abort_stderr = self.runner.run_git_command(['cherry-pick', '--abort'])
+                
+                # Check if there are still local changes after abort
+                repo_state = self.get_repo_state()
+                has_changes = (repo_state['staged'] or repo_state['modified'] or repo_state['untracked'])
+                
+                if has_changes:
+                    print(color_info("Choose an option:"))
+                    print(color_info("  [Enter] Hard reset to match remote, then redo (default)"))
+                    print(color_info("  [s]     Stash changes, redo, then restore stash"))
+                    print(color_info("  [c]     Cancel redo operation"))
+                    
+                    choice = input(color_info("Your choice: ")).strip().lower()
+                    
+                    if choice == 'c':
+                        print(color_warning("❌ Redo operation cancelled"))
+                        return False
+                    elif choice == 's':
+                        # Stash changes
+                        print(color_info("� Stashing local changes..."))
+                        stash_returncode, stash_stdout, stash_stderr = self.runner.run_git_command(['stash', 'push', '-m', 'Redo operation backup'])
+                        if stash_returncode != 0:
+                            print(color_error("❌ Failed to stash changes"))
+                            if stash_stderr:
+                                print(stash_stderr.strip())
+                            return False
+                        print(color_success("✅ Changes stashed"))
+                        
+                        # Try redo again
+                        print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
+                        returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                        
+                        if returncode == 0:
+                            print(color_success("✅ Successfully restored commit"))
+                            
+                            # Try to restore stash
+                            print(color_info("🔄 Restoring stashed changes..."))
+                            pop_returncode, pop_stdout, pop_stderr = self.runner.run_git_command(['stash', 'pop'])
+                            if pop_returncode == 0:
+                                print(color_success("✅ Stashed changes restored"))
+                            else:
+                                print(color_warning("⚠️  Could not restore stashed changes"))
+                                print(color_info("Run 'git stash pop' manually to restore"))
+                                if pop_stderr:
+                                    print(pop_stderr.strip())
+                        else:
+                            print(color_error("❌ Failed to restore commit even after stashing"))
+                            if stderr:
+                                print(stderr.strip())
+                            return False
+                    else:
+                        # Default: Hard reset to match remote and pull
+                        print(color_info("🔄 Resetting to match remote branch..."))
+                        reset_returncode, reset_stdout, reset_stderr = self.runner.run_git_command(['reset', '--hard', 'origin/developer'])
+                        if reset_returncode == 0:
+                            print(color_success("✅ Reset to remote branch"))
+                            
+                            print(color_info("� Pulling latest changes..."))
+                            pull_returncode, pull_stdout, pull_stderr = self.runner.run_git_command(['pull'])
+                            if pull_returncode == 0:
+                                print(color_success("✅ Pulled latest changes"))
+                                
+                                # Check if the target commit is already in the history
+                                check_returncode, check_stdout, check_stderr = self.runner.run_git_command(['log', '--oneline', '-n', '10'])
+                                if check_returncode == 0 and target_commit[:8] in check_stdout:
+                                    print(color_success("✅ Target commit is already present in branch history"))
+                                    print(color_info("No need to restore - commit already exists"))
+                                    return True
+                                
+                                # Try redo again
+                                print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
+                                returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                                
+                                if returncode != 0:
+                                    print(color_error("❌ Failed to restore commit after sync"))
+                                    if stderr:
+                                        print(stderr.strip())
+                                    return False
+                            else:
+                                print(color_error("❌ Failed to pull changes"))
+                                if pull_stderr:
+                                    print(pull_stderr.strip())
+                                return False
+                        else:
+                            print(color_error("❌ Failed to reset to remote"))
+                            if reset_stderr:
+                                print(reset_stderr.strip())
+                            return False
+                else:
+                    # No local changes after abort, just retry directly
+                    print(color_info("🔄 Retrying restore of commit..."))
+                    returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
+                    
+                    if returncode != 0:
+                        print(color_error("❌ Failed to restore commit"))
+                        if stderr:
+                            print(stderr.strip())
+                        return False
+        
+        if returncode == 0:
+            print(color_success("✅ Successfully restored commit"))
+            
+            # Show new state
+            print(color_info("\n📋 New repository state:"))
+            returncode, new_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+            if returncode == 0:
+                print(f"  Current HEAD: {color_success(new_stdout.strip())}")
+            
+            # Show working directory status
+            new_repo_state = self.get_repo_state()
+            if new_repo_state['staged']:
+                print(f"  Staged files: {len(new_repo_state['staged'])}")
+            if new_repo_state['modified']:
+                print(f"  Modified files: {len(new_repo_state['modified'])}")
+            if new_repo_state['untracked']:
+                print(f"  Untracked files: {len(new_repo_state['untracked'])}")
+            
+            if new_repo_state['clean']:
+                print(color_success("  Working directory is clean"))
+            
+            return True
+        else:
+            print(color_error("❌ Failed to restore commit"))
+            if stderr:
+                print(stderr.strip())
+            
+            # Try to provide helpful error information
+            if "conflict" in stderr.lower():
+                print(color_info("💡 Tip: Resolve conflicts and run 'git cherry-pick --continue'"))
+            elif "empty" in stderr.lower():
+                print(color_info("💡 This commit might already be applied"))
+
 
 def main():
-    fancy_git = FancyGit()
-    
-    if len(sys.argv) < 2:
-        print(color_error("Usage: python fancygit.py <command> [args...]"))
-        print(color_info(f"Available commands: {', '.join(fancy_git.available_commands)}"))
-        sys.exit(1)
-    
-    command = sys.argv[1]
-    args = sys.argv[2:]
-    
-    fancy_git.execute_command(command, *args)
+    try:
+        fancy_git = FancyGit()
+        
+        if len(sys.argv) < 2:
+            print(color_info("Usage: fancygit <command> [args...]"))
+            print(color_info("Available commands:"))
+            for cmd in fancy_git.available_commands:
+                print(f"  {cmd}")
+            return
+        
+        command = sys.argv[1]
+        args = sys.argv[2:]
+        
+        fancy_git.execute_command(command, *args)
+    except KeyboardInterrupt:
+        print(color_warning("\n\n⚠️  Command cancelled by user"))
+        sys.exit(130)  # Standard exit code for SIGINT
 
 if __name__ == "__main__":
     main()

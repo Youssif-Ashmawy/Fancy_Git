@@ -13,6 +13,7 @@ clean
 clone
 colors
 commit
+ship
 confirmation
 describe
 diff
@@ -32,14 +33,17 @@ mv
 notes
 pull
 push
+quiz
 range-diff
 rebase
+redo
 reset
 restore
 revert
 rm
 shortlog
 show
+ship
 sparse-checkout
 stash
 status
@@ -49,4 +53,5 @@ sync
 tag
 welcome
 worktree
+undo
 visualize
