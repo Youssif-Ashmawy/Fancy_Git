@@ -159,6 +159,23 @@ class QuizHTMLGenerator:
             border-color: #4ECDC4;
         }}
         
+        .options input[type="checkbox"] {{
+            margin-right: 15px;
+            margin-top: 2px;
+            width: 20px;
+            height: 20px;
+        }}
+        
+        .options input[type="checkbox"]:checked + span {{
+            color: #2c3e50;
+            font-weight: 600;
+        }}
+        
+        .options input[type="checkbox"]:checked ~ label {{
+            background: #e8f4f8;
+            border-color: #4ECDC4;
+        }}
+        
         .level-badge {{
             display: inline-block;
             padding: 6px 15px;
@@ -186,6 +203,7 @@ class QuizHTMLGenerator:
         
         .type-theory {{ background: #e2e3e5; color: #383d41; }}
         .type-scenario {{ background: #d1ecf1; color: #0c5460; }}
+        .type-multiple_answer {{ background: #e7f3ff; color: #004085; }}
         
         .navigation {{
             display: flex;
@@ -558,6 +576,29 @@ class QuizHTMLGenerator:
                     <span>Confirm Order</span>
                 </button>
 """
+            elif q.get('type') == 'multiple_answer':
+                html += f"""
+                <div class="ordering-instructions">
+                    📝 <strong>Select all correct answers (multiple selections possible):</strong>
+                </div>
+                <ul class="options">
+"""
+                
+                options = q.get('options', [])
+                for j, option in enumerate(options):
+                    option_letter = chr(65 + j)  # A, B, C, D
+                    html += f"""
+                    <li>
+                        <label>
+                            <input type="checkbox" name="q{i}" value="{option_letter}">
+                            <span>{option_letter}. {option}</span>
+                        </label>
+                    </li>
+"""
+                
+                html += """
+                </ul>
+"""
             else:
                 # Regular MCQ questions
                 html += """
@@ -800,6 +841,10 @@ class QuizHTMLGenerator:
                     // Check if ordering question has been confirmed
                     const container = document.getElementById(`ordering-${{i}}`);
                     isCompleted = container && container.classList.contains('completed');
+                }} else if (questionType === 'multiple_answer') {{
+                    // Check if at least one checkbox is selected for multiple answer questions
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isCompleted = selectedInputs.length > 0;
                 }} else {{
                     // Check MCQ questions
                     const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
@@ -884,8 +929,24 @@ class QuizHTMLGenerator:
             const unansweredRetryQuestions = [];
             
             for (let i = 1; i <= window.retryQuestions.length; i++) {{
-                const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
-                if (!selectedInput) {{
+                const originalNum = window.retryQuestions[i - 1];
+                const question = document.querySelector(`[data-question="${{originalNum}}"]`);
+                const questionType = question.dataset.type;
+                
+                let isAnswered = false;
+                
+                if (questionType === 'ordering') {{
+                    const container = document.getElementById(`ordering-${{originalNum}}`);
+                    isAnswered = container && container.classList.contains('completed');
+                }} else if (questionType === 'multiple_answer') {{
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isAnswered = selectedInputs.length > 0;
+                }} else {{
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    isAnswered = !!selectedInput;
+                }}
+                
+                if (!isAnswered) {{
                     unansweredRetryQuestions.push(i);
                 }}
             }}
@@ -928,10 +989,27 @@ class QuizHTMLGenerator:
                 const originalNum = window.retryQuestions[i - 1];
                 const question = document.querySelector(`[data-question="${{originalNum}}"]`);
                 const correctAnswer = question.dataset.answer;
-                const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
-                const selectedAnswer = selectedInput ? selectedInput.value : '';
+                const questionType = question.dataset.type;
                 
-                const isCorrect = selectedAnswer === correctAnswer;
+                let isCorrect = false;
+                
+                if (questionType === 'ordering') {{
+                    const selectedAnswer = getOrderingAnswer(originalNum);
+                    isCorrect = selectedAnswer === correctAnswer;
+                }} else if (questionType === 'multiple_answer') {{
+                    const selectedInputs = question.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    const selectedAnswers = Array.from(selectedInputs).map(input => input.value).sort().join('');
+                    
+                    // For multiple answer questions, correctAnswer is now a string of letters (e.g., "ACD")
+                    const correctAnswers = correctAnswer.split('').sort().join('');
+                    
+                    isCorrect = selectedAnswers === correctAnswers;
+                }} else {{
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    const selectedAnswer = selectedInput ? selectedInput.value : '';
+                    isCorrect = selectedAnswer === correctAnswer;
+                }}
+                
                 if (isCorrect) {{
                     retryCorrect++;
                 }} else {{
@@ -941,15 +1019,55 @@ class QuizHTMLGenerator:
                 // Add to retry review
                 const questionHeading = question.querySelector('h3');
                 const questionText = questionHeading.textContent.trim();
-                const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
-                const correctOption = options.find(opt => opt.startsWith(correctAnswer + '.'));
-                const selectedOption = selectedAnswer ? options.find(opt => opt.startsWith(selectedAnswer + '.')) : 'Not answered';
+                
+                let reviewContent = '';
+                if (questionType === 'ordering') {{
+                    const container = document.getElementById(`ordering-${{originalNum}}`);
+                    const items = container.querySelectorAll('.ordering-item');
+                    const userOrder = Array.from(items).map(item => item.querySelector('.order-text').textContent.trim());
+                    
+                    const correctOrderData = JSON.parse(question.dataset.options);
+                    const correctOrder = correctAnswer.split('').map(letter => {{
+                        const index = letter.charCodeAt(0) - 65;
+                        return correctOrderData[index] || '';
+                    }});
+                    
+                    reviewContent = `
+                        <strong>Your order:</strong> ${{userOrder.join(' → ')}}<br>
+                        <strong>Correct order:</strong> ${{correctOrder.join(' → ')}}
+                    `;
+                }} else if (questionType === 'multiple_answer') {{
+                    const selectedInputs = question.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    const selectedAnswers = Array.from(selectedInputs).map(input => input.value);
+                    
+                    // For multiple answer questions, correctAnswer is now a string of letters (e.g., "ACD")
+                    const correctAnswersArray = correctAnswer.split('');
+                    
+                    const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
+                    const selectedOptions = selectedAnswers.map(answer => options.find(opt => opt.startsWith(answer + '.'))).filter(Boolean);
+                    const correctOptions = correctAnswersArray.map(answer => options.find(opt => opt.startsWith(answer + '.'))).filter(Boolean);
+                    
+                    reviewContent = `
+                        <strong>Your answers:</strong> ${{selectedOptions.length > 0 ? selectedOptions.join(', ') : 'None'}}<br>
+                        <strong>Correct answers:</strong> ${{correctOptions.join(', ')}}
+                    `;
+                }} else {{
+                    const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
+                    const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                    const selectedAnswer = selectedInput ? selectedInput.value : '';
+                    const correctOption = options.find(opt => opt.startsWith(correctAnswer + '.'));
+                    const selectedOption = selectedAnswer ? options.find(opt => opt.startsWith(selectedAnswer + '.')) : 'Not answered';
+                    
+                    reviewContent = `
+                        <strong>Your answer:</strong> ${{selectedOption}}<br>
+                        <strong>Correct answer:</strong> ${{correctOption}}
+                    `;
+                }}
                 
                 retryReviewHtml += `
                     <div class="answer-item ${{isCorrect ? 'answer-correct' : 'answer-incorrect'}}">
                         <strong>Retry Question ${{i}} (Original Q${{originalNum}}):</strong> ${{questionText.split(' Question')[0]}}<br>
-                        <strong>Your answer:</strong> ${{selectedOption}}<br>
-                        <strong>Correct answer:</strong> ${{correctOption}}
+                        ${{reviewContent}}
                     </div>
                 `;
             }}
@@ -1013,6 +1131,10 @@ class QuizHTMLGenerator:
                     // Check if ordering question has been confirmed
                     const container = document.getElementById(`ordering-${{i}}`);
                     isAnswered = container && container.classList.contains('completed');
+                }} else if (questionType === 'multiple_answer') {{
+                    // Check if at least one checkbox is selected for multiple answer questions
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isAnswered = selectedInputs.length > 0;
                 }} else {{
                     // Check MCQ questions
                     const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
@@ -1064,6 +1186,16 @@ class QuizHTMLGenerator:
                     // Handle ordering questions
                     selectedAnswer = getOrderingAnswer(i);
                     isCorrect = selectedAnswer === correctAnswer;
+                }} else if (questionType === 'multiple_answer') {{
+                    // Handle multiple answer questions
+                    const selectedInputs = question.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    const selectedAnswers = Array.from(selectedInputs).map(input => input.value).sort().join('');
+                    
+                    // For multiple answer questions, correctAnswer is now a string of letters (e.g., "ACD")
+                    const correctAnswers = correctAnswer.split('').sort().join('');
+                    
+                    selectedAnswer = selectedAnswers;
+                    isCorrect = selectedAnswers === correctAnswers;
                 }} else {{
                     // Handle MCQ questions
                     const selectedInput = question.querySelector(`input[name="q${{i}}"]:checked`);
@@ -1097,6 +1229,22 @@ class QuizHTMLGenerator:
                     reviewContent = `
                         <strong>Your order:</strong> ${{userOrder.join(' → ')}}<br>
                         <strong>Correct order:</strong> ${{correctOrder.join(' → ')}}
+                    `;
+                }} else if (questionType === 'multiple_answer') {{
+                    // For multiple answer questions, show selected vs correct answers
+                    const selectedInputs = question.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    const selectedAnswers = Array.from(selectedInputs).map(input => input.value);
+                    
+                    // For multiple answer questions, correctAnswer is now a string of letters (e.g., "ACD")
+                    const correctAnswersArray = correctAnswer.split('');
+                    
+                    const options = Array.from(question.querySelectorAll('.options li span')).map(span => span.textContent);
+                    const selectedOptions = selectedAnswers.map(answer => options.find(opt => opt.startsWith(answer + '.'))).filter(Boolean);
+                    const correctOptions = correctAnswersArray.map(answer => options.find(opt => opt.startsWith(answer + '.'))).filter(Boolean);
+                    
+                    reviewContent = `
+                        <strong>Your answers:</strong> ${{selectedOptions.length > 0 ? selectedOptions.join(', ') : 'None'}}<br>
+                        <strong>Correct answers:</strong> ${{correctOptions.join(', ')}}
                     `;
                 }} else {{
                     // For MCQ questions
@@ -1175,9 +1323,9 @@ class QuizHTMLGenerator:
             document.querySelector('.navigation').style.display = 'flex';
             document.getElementById('question-squares').style.display = 'flex';
             
-            // Clear all radio button selections
-            document.querySelectorAll('input[type="radio"]').forEach(radio => {{
-                radio.checked = false;
+            // Clear all radio button and checkbox selections
+            document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {{
+                input.checked = false;
             }});
             
             // Hide all questions first and reset their display
@@ -1201,10 +1349,15 @@ class QuizHTMLGenerator:
                     const updatedText = originalText.replace(/^\\d+\\./, `${{retryIndex + 1}}.`);
                     questionHeading.textContent = updatedText;
                     
-                    // Update radio button names to use retry numbers
+                    // Update radio button and checkbox names to use retry numbers
                     const radios = question.querySelectorAll('input[type="radio"]');
                     radios.forEach(radio => {{
                         radio.name = `q${{retryIndex + 1}}`;
+                    }});
+                    
+                    const checkboxes = question.querySelectorAll('input[type="checkbox"]');
+                    checkboxes.forEach(checkbox => {{
+                        checkbox.name = `q${{retryIndex + 1}}`;
                     }});
                     
                     // Keep the question hidden for now
@@ -1240,13 +1393,13 @@ class QuizHTMLGenerator:
             
             for (let i = 1; i <= window.retryQuestions.length; i++) {{
                 const square = document.getElementById(`retry-square-${{i}}`);
-                const selectedInput = document.querySelector(`input[name="q${{i}}"]:checked`);
+                const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
                 
                 square.classList.remove('active', 'completed', 'unanswered');
                 
                 if (i === currentRetryQuestion) {{
                     square.classList.add('active');
-                }} else if (selectedInput) {{
+                }} else if (selectedInputs.length > 0) {{
                     square.classList.add('completed');
                 }} else {{
                     square.classList.add('unanswered');
@@ -1315,9 +1468,9 @@ class QuizHTMLGenerator:
             }}
         }});
         
-        // Add event listeners for radio buttons to update squares in real-time
+        // Add event listeners for radio buttons and checkboxes to update squares in real-time
         document.addEventListener('change', function(e) {{
-            if (e.target.type === 'radio') {{
+            if (e.target.type === 'radio' || e.target.type === 'checkbox') {{
                 updateSquareStates();
             }}
         }});
