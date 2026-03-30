@@ -598,10 +598,8 @@ class FancyGit:
                             ai_analysis = self.ollama.analyze_error_messages(error_data)
                         
                         if ai_analysis:
-                            print(color_ai("\n🧠 AI Analysis & Suggestions:"))
-                            print(Colors.divider("-", 40))
+                            print(color_ai("🧠 AI:"))
                             print(color_ai(ai_analysis))
-                            print(Colors.divider("-", 40))
                         else:
                             print(color_warning("⚠️  AI analysis failed"))
                     else:

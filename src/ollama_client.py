@@ -74,7 +74,8 @@ class OllamaClient:
             try:
                 response = self._call_ollama(prompt)
                 if response:
-                    return response
+                    # Post-process to ensure clean format
+                    return self._clean_ai_response(response)
             except Exception as e:
                 if attempt == self.max_retries:
                     return f"Failed to get AI analysis after {self.max_retries + 1} attempts: {str(e)}"
@@ -84,14 +85,14 @@ class OllamaClient:
     
     def _build_analysis_prompt(self, messages: List[Dict]) -> str:
         """Build the analysis prompt for the AI model"""
-        prompt = """You are a Git expert assistant. Analyze the following Git error/warning messages and provide:
-        1. A clear summary of what went wrong
-        2. Step-by-step instructions on how to resolve the issue
-        3. Any preventive measures to avoid this in the future
+        prompt = """You are a Git expert. Provide ONLY this exact format:
 
-        Keep your response concise, practical, and focused on solutions.
+PROBLEM: [1 line description]
+SOLUTION: [1-2 line fix]
 
-        Messages to analyze:
+No extra text, no explanations, no numbered lists.
+
+Messages:
         """
         
         for i, msg in enumerate(messages, 1):
@@ -104,6 +105,56 @@ class OllamaClient:
         
         prompt += "\n\nAnalysis:"
         return prompt
+    
+    def _clean_ai_response(self, response: str) -> str:
+        """Clean and format AI response to ensure consistent output"""
+        lines = response.strip().split('\n')
+        problem = ""
+        solution = ""
+        
+        for line in lines:
+            line = line.strip()
+            # Remove common prefixes
+            clean_line = line
+            if clean_line.lower().startswith('problem:'):
+                clean_line = clean_line.replace('Problem:', '').replace('PROBLEM:', '').strip()
+                problem = clean_line
+            elif clean_line.lower().startswith('solution:'):
+                clean_line = clean_line.replace('Solution:', '').replace('SOLUTION:', '').strip()
+                solution = clean_line
+            elif clean_line.startswith('-') or clean_line.startswith('•'):
+                clean_line = clean_line.lstrip('-• ').strip()
+                if not solution:
+                    solution = clean_line
+            elif not problem and ('error' in clean_line.lower() or 'issue' in clean_line.lower() or 'fatal' in clean_line.lower()):
+                problem = clean_line
+            elif not solution and ('fix' in clean_line.lower() or 'run' in clean_line.lower() or 'use' in clean_line.lower() or 'make' in clean_line.lower()):
+                solution = clean_line
+        
+        # Fallback if no structured format found
+        if not problem or not solution:
+            # Try to extract from unstructured response
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if line and not line.startswith('-') and not line.startswith('•') and not line.startswith('1.') and not line.startswith('2.'):
+                    if not problem:
+                        problem = line[:100] + '...' if len(line) > 100 else line
+                    elif not solution:
+                        solution = line[:100] + '...' if len(line) > 100 else line
+                        break
+        
+        # Clean up any remaining formatting issues
+        if solution:
+            solution = solution.replace('SOLUTION:', '').replace('solution:', '').strip()
+            solution = solution.lstrip('-• ').strip()
+        
+        # Format final output
+        if problem and solution:
+            return f"PROBLEM: {problem}\n\nSOLUTION: {solution}"
+        elif problem:
+            return f"PROBLEM: {problem}\n\nSOLUTION: Check the error and try the suggested fix."
+        else:
+            return response[:200]  # Fallback to truncated response
     
     def generate_commit_message(self, context: Dict) -> str:
         """
@@ -200,7 +251,7 @@ Generate ONLY the commit message in the specified format, no explanation:""".for
                 "options": {
                     "temperature": 0.3,
                     "top_p": 0.9,
-                    "max_tokens": 800  # Increased for multi-line responses
+                    "max_tokens": 200  # Reduced for shorter responses
                 }
             }
             
