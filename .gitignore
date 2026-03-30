@@ -5,5 +5,5 @@ __pycache__/
 *.pyo
 .fancygit/
 .venv/
-quiz.html # This will be generated with every quiz run
-.used_questions.json # This will be created and updated with every quiz run
+quiz.html
+.used_questions.json
