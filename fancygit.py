@@ -595,14 +595,17 @@ class FancyGit:
                     
                     if error_data:
                         # Start loading animation during AI analysis
-                        with LoadingContext(animation_type=self.loading_animation_type):
-                            ai_analysis = self.ollama.analyze_error_messages(error_data)
-                        
-                        if ai_analysis:
-                            print(color_ai("🧠 AI:"))
-                            print(color_ai(ai_analysis))
-                        else:
-                            print(color_warning("⚠️  AI analysis failed"))
+                        try:
+                            with LoadingContext(animation_type=self.loading_animation_type):
+                                ai_analysis = self.ollama.analyze_error_messages(error_data)
+                            
+                            if ai_analysis:
+                                print(color_ai("🧠 AI:"))
+                                print(color_ai(ai_analysis))
+                            else:
+                                print(color_warning("⚠️  AI analysis failed"))
+                        except KeyboardInterrupt:
+                            print(color_warning("\n\n⚠️  AI analysis cancelled by user"))
                     else:
                         print(color_warning("⚠️  No valid error data for AI analysis"))
                 except Exception as e:
@@ -1034,8 +1037,12 @@ class FancyGit:
                     current_model = self.ollama.get_current_model()
                     
                     # Generate AI commit message
-                    with LoadingContext(animation_type=self.loading_animation_type):
-                        ai_suggestion = self.ollama.generate_commit_message(context)
+                    try:
+                        with LoadingContext(animation_type=self.loading_animation_type):
+                            ai_suggestion = self.ollama.generate_commit_message(context)
+                    except KeyboardInterrupt:
+                        print(color_warning("\n\n⚠️  AI generation cancelled by user"))
+                        ai_suggestion = None
                     
                     if ai_suggestion:
                         # Display the AI suggestion in a formatted way
@@ -1595,22 +1602,26 @@ class FancyGit:
                 print(color_info("💡 Tip: Resolve conflicts and run 'git cherry-pick --continue'"))
             elif "empty" in stderr.lower():
                 print(color_info("💡 This commit might already be applied"))
-            
-            return False
 
 
 def main():
-    fancy_git = FancyGit()
-    
-    if len(sys.argv) < 2:
-        print(color_error("Usage: python fancygit.py <command> [args...]"))
-        print(color_info(f"Available commands: {', '.join(fancy_git.available_commands)}"))
-        sys.exit(1)
-    
-    command = sys.argv[1]
-    args = sys.argv[2:]
-    
-    fancy_git.execute_command(command, *args)
+    try:
+        fancy_git = FancyGit()
+        
+        if len(sys.argv) < 2:
+            print(color_info("Usage: fancygit <command> [args...]"))
+            print(color_info("Available commands:"))
+            for cmd in fancy_git.available_commands:
+                print(f"  {cmd}")
+            return
+        
+        command = sys.argv[1]
+        args = sys.argv[2:]
+        
+        fancy_git.execute_command(command, *args)
+    except KeyboardInterrupt:
+        print(color_warning("\n\n⚠️  Command cancelled by user"))
+        sys.exit(130)  # Standard exit code for SIGINT
 
 if __name__ == "__main__":
     main()
