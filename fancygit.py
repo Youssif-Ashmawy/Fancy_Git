@@ -2,6 +2,7 @@
 import subprocess
 import re
 import sys
+import signal
 import os
 import webbrowser
 import json
@@ -984,54 +985,77 @@ class FancyGit:
             returncode, current_staged, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
             originally_staged = current_staged.strip().split('\n') if current_staged.strip() else []
             
-            # Temporarily stage the selected files for accurate AI analysis
+            # Store cleanup function for signal handling
             temp_staged_files = []
-            for file_path in files_to_stage:
-                if file_path != '.':
-                    returncode, _, stderr = self.runner.run_git_command(['add', file_path])
-                    if returncode == 0:
-                        temp_staged_files.append(file_path)
             
-            # Now get the real staged diff for AI analysis
-            returncode, diff_output, stderr = self.runner.run_git_command(['diff', '--cached'])
+            def cleanup_temp_staging():
+                """Clean up temporarily staged files"""
+                for file_path in temp_staged_files:
+                    # Only unstage if it wasn't originally staged
+                    if file_path not in originally_staged:
+                        try:
+                            self.runner.run_git_command(['reset', 'HEAD', file_path])
+                        except:
+                            pass  # Ignore cleanup errors
             
-            if returncode == 0 and diff_output.strip():
-                # Get list of staged files
-                returncode, staged_files_output, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
-                staged_files = staged_files_output.strip().split('\n') if staged_files_output.strip() else []
+            def signal_handler(signum, frame):
+                """Handle Ctrl+C signal"""
+                print(color_warning("\n\n⚠️  Interrupted! Cleaning up temporary staging..."))
+                cleanup_temp_staging()
+                sys.exit(1)
+            
+            # Set up signal handler for Ctrl+C
+            original_signal = signal.signal(signal.SIGINT, signal_handler)
+            
+            try:
+                # Temporarily stage the selected files for accurate AI analysis
+                for file_path in files_to_stage:
+                    if file_path != '.':
+                        returncode, _, stderr = self.runner.run_git_command(['add', file_path])
+                        if returncode == 0:
+                            temp_staged_files.append(file_path)
                 
-                # Prepare context for AI
-                context = {
-                    'branch': current_branch,
-                    'staged_files': staged_files if staged_files else ['selected changes'],
-                    'diff': diff_output[:2000]  # Limit diff size for AI processing
-                }
+                # Now get the real staged diff for AI analysis (only new changes since last commit)
+                returncode, diff_output, stderr = self.runner.run_git_command(['diff', '--cached', 'HEAD~1'])
                 
-                # Get current AI model for display
-                current_model = self.ollama.get_current_model()
-                
-                # Generate AI commit message
-                with LoadingContext(animation_type=self.loading_animation_type):
-                    ai_suggestion = self.ollama.generate_commit_message(context)
-                
-                if ai_suggestion:
-                    # Display the AI suggestion in a formatted way
-                    print(color_ai(f"\n🤖 AI Suggestion (using {current_model}):"))
-                    print(color_ai("─" * 40))
-                    for line in ai_suggestion.split('\n'):
-                        if line.strip():
-                            print(color_ai(f"  {line}"))
-                    print(color_ai("─" * 40))
+                if returncode == 0 and diff_output.strip():
+                    # Get list of staged files
+                    returncode, staged_files_output, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
+                    staged_files = staged_files_output.strip().split('\n') if staged_files_output.strip() else []
+                    
+                    # Prepare context for AI
+                    context = {
+                        'branch': current_branch,
+                        'staged_files': staged_files if staged_files else ['selected changes'],
+                        'diff': diff_output[:2000]  # Limit diff size for AI processing
+                    }
+                    
+                    # Get current AI model for display
+                    current_model = self.ollama.get_current_model()
+                    
+                    # Generate AI commit message
+                    with LoadingContext(animation_type=self.loading_animation_type):
+                        ai_suggestion = self.ollama.generate_commit_message(context)
+                    
+                    if ai_suggestion:
+                        # Display the AI suggestion in a formatted way
+                        print(color_ai(f"\n🤖 AI Suggestion (using {current_model}):"))
+                        print(color_ai("─" * 40))
+                        for line in ai_suggestion.split('\n'):
+                            if line.strip():
+                                print(color_ai(f"  {line}"))
+                        print(color_ai("─" * 40))
+                    else:
+                        print(color_warning("⚠️  AI suggestion failed"))
                 else:
-                    print(color_warning("⚠️  AI suggestion failed"))
-            else:
-                print(color_warning("⚠️  No changes found for AI analysis"))
-            
-            # Restore original staging state - unstage temporarily staged files
-            for file_path in temp_staged_files:
-                # Only unstage if it wasn't originally staged
-                if file_path not in originally_staged:
-                    self.runner.run_git_command(['reset', 'HEAD', file_path])
+                    print(color_warning("⚠️  No changes found for AI analysis"))
+                
+                # Restore original staging state - unstage temporarily staged files
+                cleanup_temp_staging()
+                
+            finally:
+                # Restore original signal handler
+                signal.signal(signal.SIGINT, original_signal)
                 
         except Exception as e:
             print(color_warning(f"⚠️  AI suggestion error: {e}"))
