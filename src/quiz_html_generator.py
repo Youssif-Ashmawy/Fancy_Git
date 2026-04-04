@@ -866,9 +866,13 @@ class QuizHTMLGenerator:
             }}
             
             // Update submit button visibility
-            updateSquareStates();
+            if (window.retryMode) {{
+                updateRetrySquareStates();
+            }} else {{
+                updateSquareStates();
+            }}
         }}
-        
+
         // Make sure the function is globally accessible
         window.confirmOrder = confirmOrder;
         
@@ -1626,18 +1630,35 @@ class QuizHTMLGenerator:
                     const originalText = questionHeading.textContent;
                     const updatedText = originalText.replace(/^\\d+\\./, `${{retryIndex + 1}}.`);
                     questionHeading.textContent = updatedText;
-                    
+
                     // Update radio button and checkbox names to use retry numbers
                     const radios = question.querySelectorAll('input[type="radio"]');
                     radios.forEach(radio => {{
                         radio.name = `q${{retryIndex + 1}}`;
                     }});
-                    
+
                     const checkboxes = question.querySelectorAll('input[type="checkbox"]');
                     checkboxes.forEach(checkbox => {{
                         checkbox.name = `q${{retryIndex + 1}}`;
                     }});
-                    
+
+                    // Reset ordering questions so the user can re-answer them
+                    if (question.dataset.type === 'ordering') {{
+                        const container = document.getElementById(`ordering-${{originalNum}}`);
+                        const confirmBtn = document.getElementById(`confirm-btn-${{originalNum}}`);
+                        if (container) {{
+                            container.classList.remove('completed');
+                            container.querySelectorAll('.ordering-item').forEach(item => {{
+                                item.draggable = true;
+                                item.style.cursor = 'move';
+                            }});
+                        }}
+                        if (confirmBtn) {{
+                            confirmBtn.classList.remove('confirmed');
+                            confirmBtn.innerHTML = '<span>✓</span><span>Confirm Order</span>';
+                        }}
+                    }}
+
                     // Keep the question hidden for now
                     question.style.display = 'none';
                 }}
@@ -1671,16 +1692,27 @@ class QuizHTMLGenerator:
         
         function updateRetrySquareVisuals() {{
             if (!window.retryMode) return;
-            
+
             for (let i = 1; i <= window.retryQuestions.length; i++) {{
                 const square = document.getElementById(`retry-square-${{i}}`);
-                const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
-                
+                const originalNum = window.retryQuestions[i - 1];
+                const question = document.querySelector(`[data-question="${{originalNum}}"]`);
+                const questionType = question ? question.dataset.type : null;
+
+                let isAnswered = false;
+                if (questionType === 'ordering') {{
+                    const container = document.getElementById(`ordering-${{originalNum}}`);
+                    isAnswered = container && container.classList.contains('completed');
+                }} else {{
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isAnswered = selectedInputs.length > 0;
+                }}
+
                 square.classList.remove('active', 'completed', 'unanswered');
-                
+
                 if (i === currentRetryQuestion) {{
                     square.classList.add('active');
-                }} else if (selectedInputs.length > 0) {{
+                }} else if (isAnswered) {{
                     square.classList.add('completed');
                 }} else {{
                     square.classList.add('unanswered');
@@ -1690,24 +1722,35 @@ class QuizHTMLGenerator:
         
         function updateRetrySquareStates() {{
             if (!window.retryMode) return;
-            
+
             let allRetryAnswered = true;
             let lastUnansweredRetryQuestion = 0;
-            
+
             for (let i = 1; i <= window.retryQuestions.length; i++) {{
                 const square = document.getElementById(`retry-square-${{i}}`);
-                const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
-                
+                const originalNum = window.retryQuestions[i - 1];
+                const question = document.querySelector(`[data-question="${{originalNum}}"]`);
+                const questionType = question ? question.dataset.type : null;
+
+                let isAnswered = false;
+                if (questionType === 'ordering') {{
+                    const container = document.getElementById(`ordering-${{originalNum}}`);
+                    isAnswered = container && container.classList.contains('completed');
+                }} else {{
+                    const selectedInputs = document.querySelectorAll(`input[name="q${{i}}"]:checked`);
+                    isAnswered = selectedInputs.length > 0;
+                }}
+
                 square.classList.remove('active', 'completed', 'unanswered');
-                
+
                 if (i === currentRetryQuestion) {{
                     square.classList.add('active');
-                }} else if (selectedInputs.length > 0) {{
+                }} else if (isAnswered) {{
                     square.classList.add('completed');
                 }} else {{
                     square.classList.add('unanswered');
                     allRetryAnswered = false;
-                    lastUnansweredRetryQuestion = i; // Track the last unanswered retry question
+                    lastUnansweredRetryQuestion = i;
                 }}
             }}
             
@@ -1718,6 +1761,12 @@ class QuizHTMLGenerator:
         }}
         
         function isRetryQuestionAnswered(retryQuestionNum) {{
+            const originalNum = window.retryQuestions[retryQuestionNum - 1];
+            const question = document.querySelector(`[data-question="${{originalNum}}"]`);
+            if (question && question.dataset.type === 'ordering') {{
+                const container = document.getElementById(`ordering-${{originalNum}}`);
+                return container && container.classList.contains('completed');
+            }}
             const selectedInputs = document.querySelectorAll(`input[name="q${{retryQuestionNum}}"]:checked`);
             return selectedInputs.length > 0;
         }}
