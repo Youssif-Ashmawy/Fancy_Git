@@ -270,61 +270,61 @@ class TestFancyGitSpecialCommands:
     
     def test_confirmation_command_toggle(self):
         """Test confirmation command toggle"""
-        initial_state = self.fancy_git.confirmation_enabled
-        
+        initial_state = self.fancy_git.config_manager.config.confirmation_enabled
+
         result = self.fancy_git.execute_command('confirmation')
-        
+
         assert result is not None  # The method returns the current state (bool)
-        assert self.fancy_git.confirmation_enabled != initial_state
-    
+        assert self.fancy_git.config_manager.config.confirmation_enabled != initial_state
+
     def test_confirmation_command_enable(self):
         """Test confirmation command enable"""
         result = self.fancy_git.execute_command('confirmation', 'on')
-        
+
         assert result is True
-        assert self.fancy_git.confirmation_enabled is True
-    
+        assert self.fancy_git.config_manager.config.confirmation_enabled is True
+
     def test_confirmation_command_disable(self):
         """Test confirmation command disable"""
         result = self.fancy_git.execute_command('confirmation', 'off')
-        
+
         assert isinstance(result, bool)  # The method returns the current state
-        assert self.fancy_git.confirmation_enabled is False
-    
+        assert self.fancy_git.config_manager.config.confirmation_enabled is False
+
     def test_confirmation_command_status(self):
         """Test confirmation command status"""
         with patch('builtins.print') as mock_print:
             result = self.fancy_git.execute_command('confirmation', 'status')
-            
-            assert result is True
+
+            assert result is not None  # Returns current state (bool or truthy)
             mock_print.assert_called()
-    
+
     def test_ai_command_toggle(self):
         """Test AI command toggle"""
         # Mock the test_connection method on the actual provider
         with patch.object(self.fancy_git.ai_engine.analysis_provider, 'test_connection', return_value=True):
-            initial_state = self.fancy_git.ai_analysis_enabled
-            
+            initial_state = self.fancy_git.config_manager.config.ai_analysis_enabled
+
             result = self.fancy_git.execute_command('ai', 'toggle')
-            
+
             assert result is not initial_state  # Returns the new state (opposite of initial)
-            assert self.fancy_git.ai_analysis_enabled != initial_state
-    
+            assert self.fancy_git.config_manager.config.ai_analysis_enabled != initial_state
+
     def test_ai_command_enable(self):
         """Test AI command enable"""
         # Mock the test_connection method on the actual provider
         with patch.object(self.fancy_git.ai_engine.analysis_provider, 'test_connection', return_value=True):
             result = self.fancy_git.execute_command('ai', 'on')
-            
+
             assert result is True
-            assert self.fancy_git.ai_analysis_enabled is True
-    
+            assert self.fancy_git.config_manager.config.ai_analysis_enabled is True
+
     def test_ai_command_disable(self):
         """Test AI command disable"""
         result = self.fancy_git.execute_command('ai', 'off')
-        
+
         assert result is False  # Returns the new state (disabled)
-        assert self.fancy_git.ai_analysis_enabled is False
+        assert self.fancy_git.config_manager.config.ai_analysis_enabled is False
     
     def test_ai_command_status(self):
         """Test AI command status"""

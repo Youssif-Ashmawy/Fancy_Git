@@ -308,35 +308,35 @@ class TestFancyGitSpecialCommandWorkflows:
         """Test confirmation workflow"""
         mock_run_git.return_value = (0, "On branch main", "")
         mock_input.return_value = 'y'  # User confirms the command
-        
-        # Enable confirmation for this test
-        self.fancy_git.confirmation_enabled = True
-        
+
+        # Enable confirmation for this test via the config object (actual check location)
+        self.fancy_git.config_manager.config.confirmation_enabled = True
+
         # Patch the sys.modules check at the point where it's used
         with patch.object(sys, 'modules', {}):
             # Execute command with confirmation
             status_result = self.fancy_git.execute_command('status')
-        
+
         # Verify confirmation was requested and command executed
         assert status_result is True
         mock_input.assert_called_once()
         mock_run_git.assert_called_once_with(['status'])
-    
+
     @patch('builtins.input')
     @patch('src.git_runner.GitRunner.run_git_command')
     def test_confirmation_cancel_workflow(self, mock_run_git, mock_input):
         """Test confirmation cancellation workflow"""
         mock_input.return_value = 'n'  # User cancels the command
         mock_run_git.return_value = (0, "On branch main", "")  # Mock return value
-        
-        # Enable confirmation for this test
-        self.fancy_git.confirmation_enabled = True
-        
+
+        # Enable confirmation for this test via the config object (actual check location)
+        self.fancy_git.config_manager.config.confirmation_enabled = True
+
         # Patch the sys.modules check at the point where it's used
         with patch.object(sys, 'modules', {}):
             # Execute command but cancel confirmation
             status_result = self.fancy_git.execute_command('status')
-        
+
         # Verify confirmation was requested and command was cancelled
         assert status_result is False
         mock_input.assert_called_once()
