@@ -20,6 +20,7 @@ try:
     from src.git_insights import GitInsights
     # from src.ollama_client import OllamaClient
     from src.ai_engine import AIEngine
+    from src.config_manager import ConfigManager
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
@@ -29,7 +30,7 @@ except ImportError:
     # When installed as a module, add the current directory to path
     current_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, current_dir)
-    
+
     from src.git_runner import GitRunner
     from src.git_error_parser import GitErrorParser
     from src.git_error import GitError
@@ -37,6 +38,7 @@ except ImportError:
     from src.git_insights import GitInsights
     # from src.ollama_client import OllamaClient
     from src.ai_engine import AIEngine
+    from src.config_manager import ConfigManager
     from src.loading_animation import LoadingContext
     from src.colors import Colors, color_command, color_success, color_error, color_warning, color_info, color_ai, color_header, color_file, color_branch
     from src.output_colorizer import OutputColorizer
@@ -73,6 +75,15 @@ class FancyGit:
         
         # Initialize quiz manager
         self.quiz_manager = QuizManager()
+
+        # Load available commands
+        self.available_commands = self._load_commands()
+        self.loading_animation_type = self.config_manager.config.loading_animation
+        self.confirmation_enabled = self.config_manager.config.confirmation_enabled
+        self.output_coloring_enabled = self.config_manager.config.output_coloring_enabled
+
+        # Initialize AI engine
+        self.ai_engine = AIEngine(self.config_manager)
     
     def _load_commands(self):
         """Dynamically load commands from command-list.txt file"""
@@ -657,7 +668,7 @@ class FancyGit:
                         # Start loading animation during AI analysis
                         try:
                             with LoadingContext(animation_type=self.loading_animation_type):
-                                ai_analysis = self.ollama.analyze_error_messages(error_data)
+                                ai_analysis = self.ai_engine.analyze_error_messages(error_data)
                             
                             if ai_analysis:
                                 print(color_ai("🧠 AI:"))
@@ -1094,12 +1105,13 @@ class FancyGit:
                     }
                     
                     # Get current AI model for display
-                    current_model = self.ollama.get_current_model()
-                    
+                    provider = self.ai_engine.analysis_provider
+                    current_model = provider.get_current_model() if hasattr(provider, 'get_current_model') else self.config_manager.config.default_ollama_model
+
                     # Generate AI commit message
                     try:
                         with LoadingContext(animation_type=self.loading_animation_type):
-                            ai_suggestion = self.ollama.generate_commit_message(context)
+                            ai_suggestion = provider.generate_commit_message(context) if hasattr(provider, 'generate_commit_message') else None
                     except KeyboardInterrupt:
                         print(color_warning("\n\n⚠️  AI generation cancelled by user"))
                         ai_suggestion = None

@@ -31,7 +31,11 @@ class AIEngine:
         
         # Prepare the prompt with error context
         prompt = self._build_analysis_prompt(messages)
-        
+
+        # Resolve the exact model name before calling (handles version tags)
+        if hasattr(self.analysis_provider, '_ensure_model_available'):
+            self.analysis_provider._ensure_model_available()
+
         try:
             response = self.analysis_provider._call_model(prompt)
             return response if response else "Unable to get AI analysis."
