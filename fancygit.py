@@ -1089,24 +1089,24 @@ class FancyGit:
                         if returncode == 0:
                             temp_staged_files.append(file_path)
                 
-                # Now get the real staged diff for AI analysis (only new changes since last commit)
-                returncode, diff_output, stderr = self.runner.run_git_command(['diff', '--cached', 'HEAD~1'])
-                
+                # Get only the currently staged diff (not previous commits)
+                returncode, diff_output, stderr = self.runner.run_git_command(['diff', '--cached'])
+
                 if returncode == 0 and diff_output.strip():
                     # Get list of staged files
                     returncode, staged_files_output, stderr = self.runner.run_git_command(['diff', '--cached', '--name-only'])
                     staged_files = staged_files_output.strip().split('\n') if staged_files_output.strip() else []
-                    
+
                     # Prepare context for AI
                     context = {
                         'branch': current_branch,
                         'staged_files': staged_files if staged_files else ['selected changes'],
-                        'diff': diff_output[:2000]  # Limit diff size for AI processing
+                        'diff': diff_output[:2000]
                     }
-                    
-                    # Get current AI model for display
+
                     provider = self.ai_engine.analysis_provider
-                    current_model = provider.get_current_model() if hasattr(provider, 'get_current_model') else self.config_manager.config.default_ollama_model
+                    # Show the commit model name, not the default model
+                    commit_model = self.config_manager.config.default_commit_model if hasattr(self.config_manager.config, 'default_commit_model') else self.config_manager.config.default_ollama_model
 
                     # Generate AI commit message
                     try:
@@ -1115,10 +1115,9 @@ class FancyGit:
                     except KeyboardInterrupt:
                         print(color_warning("\n\n⚠️  AI generation cancelled by user"))
                         ai_suggestion = None
-                    
+
                     if ai_suggestion:
-                        # Display the AI suggestion in a formatted way
-                        print(color_ai(f"\n🤖 AI Suggestion (using {current_model}):"))
+                        print(color_ai(f"\n🤖 AI Suggestion (using {commit_model}):"))
                         print(color_ai("─" * 40))
                         for line in ai_suggestion.split('\n'):
                             if line.strip():

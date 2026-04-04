@@ -18,7 +18,8 @@ class FancyGitConfig:
     explanation_provider: str = "ollama"    # handles 'explain' command
     translation_provider: str = "ollama"    # reserved for future use
 
-    default_ollama_model: str = "llama3.2" 
+    default_ollama_model: str = "llama3.2"
+    default_commit_model: str = "codellama"  # model used for commit message generation
     ollama_api_url: str = "http://localhost:11434"
     ollama_timeout: int = 30
     ollama_max_retries: int = 3

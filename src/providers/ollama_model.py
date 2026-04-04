@@ -155,69 +155,149 @@ class OllamaModel(BaseModel):
         if not context:
             return "feat: add new functionality\n- initial implementation"
 
-        if not self._ensure_model_available():
-            return "feat: add changes\n- unable to connect to Ollama"
+        # Switch to the configured commit model (defaults to codellama)
+        previous_model = self.model
+        commit_model = self.config_manager.config.default_commit_model
+        switched = self.set_model(commit_model)
+        if not switched:
+            # Commit model not installed, fall back to whatever is available
+            if not self._ensure_model_available():
+                return "feat: add changes\n- unable to connect to Ollama"
 
         prompt = self._build_commit_prompt(context)
 
-        for attempt in range(self.max_retries + 1):
-            try:
-                response = self._call_model(prompt)
-                if response:
-                    return self._format_commit_response(response)
-            except Exception as e:
-                if attempt == self.max_retries:
-                    return (
-                        f"feat: add changes to {context.get('branch', 'current')}\n"
-                        f"- fallback due to AI error: {str(e)[:50]}"
-                    )
-                time.sleep(1)
+        # Use a tight token budget so the model can't ramble
+        original_max_tokens = self.max_tokens
+        self.max_tokens = 150
+
+        try:
+            for attempt in range(self.max_retries + 1):
+                try:
+                    response = self._call_model(prompt)
+                    if response:
+                        return self._format_commit_response(response)
+                except Exception as e:
+                    if attempt == self.max_retries:
+                        return (
+                            f"feat: add changes to {context.get('branch', 'current')}\n"
+                            f"- fallback due to AI error: {str(e)[:50]}"
+                        )
+                    time.sleep(1)
+        finally:
+            self.max_tokens = original_max_tokens
+            # Always restore the original model
+            self.set_model(previous_model) or setattr(self, 'model', previous_model)
 
         return "feat: update repository\n- generic commit message"
 
     def _build_commit_prompt(self, context: Dict) -> str:
-        return """You are a Git expert. Generate a commit message based on the following staged changes:
+        return """Generate a git commit message for these changes. Reply with ONLY the commit message lines, no commentary.
 
-Repository Context:
-- Branch: {branch}
-- Files being committed: {files}
+Files changed: {files}
 
-Staged Changes (git diff --cached):
+Diff:
 {diff}
 
-Requirements:
-1. Use this EXACT format:
-   feat(scope): a short summary
-   - point 1
-   - point 2
-
-2. Format details:
-   - Use conventional commit types: feat, fix, docs, style, refactor, test, chore
-   - scope should be the module/area affected
-   - summary must be under 50 characters, imperative mood
-   - bullet points describe specific changes
-
-Generate ONLY the commit message, no explanation:""".format(
-            branch=context.get("branch", "main"),
+Reply with ONLY these lines (no preamble, no explanation):
+<type>(<scope>): <summary under 50 chars>
+- <specific change referencing actual function/class/variable names>
+- <specific change>
+- <specific change>""".format(
             files=", ".join(context.get("staged_files", ["files"])),
             diff=context.get("diff", "No diff available")[:2000],
         )
 
     def _format_commit_response(self, response: str) -> str:
         """Normalise the raw model output into summary + bullet lines"""
-        lines = [l.strip() for l in response.split("\n") if l.strip()]
-        if not lines:
+        import re
+
+        # If the model wrapped its answer in a fenced code block, extract the contents
+        fenced = re.search(r'`+\n?(.*?)\n?`+', response, re.DOTALL)
+        if fenced:
+            response = fenced.group(1).strip()
+
+        commit_pattern = re.compile(
+            r'^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+?\))?!?:\s+.+',
+            re.IGNORECASE
+        )
+
+        all_lines = [l.strip() for l in response.split("\n")]
+
+        def clean_summary(line: str) -> str:
+            line = line.strip("`\"'")
+            line = re.sub(r'^[-*\s]+', '', line)          # strip leading * or -
+            line = re.sub(r'\s*\(#\d+\)\s*$', '', line)  # strip trailing (#123)
+            # Normalise "(feat)(scope):" → "feat(scope):"
+            line = re.sub(r'^\((\w+)\)\((\w+)\):', r'\1(\2):', line)
+            # Normalise "(feat)(scope):" or "(feat):" → "feat(scope):" or "feat:"
+            line = re.sub(r'^\((\w+)\)(\([\w/]+\))?:', r'\1\2:', line)
+            # Normalise "(scope):" with no type → "feat(scope):"
+            line = re.sub(r'^\(([^)]+)\):', r'feat(\1):', line)
+            return line.strip()
+
+        # Find the first line that looks like a real conventional commit summary
+        summary = None
+        summary_idx = 0
+        for i, line in enumerate(all_lines):
+            candidate = clean_summary(line)
+            if commit_pattern.match(candidate):
+                summary = candidate
+                summary_idx = i
+                break
+
+        # Fallback: use first non-empty line if no conventional commit found
+        if summary is None:
+            for i, line in enumerate(all_lines):
+                if line:
+                    summary = clean_summary(line)
+                    summary_idx = i
+                    break
+
+        if not summary:
             return "feat: update repository\n- implementation changes"
 
-        summary = lines[0].strip("`\"'")
-        bullets = []
-        for line in lines[1:]:
-            line = line.strip("`\"'")
-            if line and not line.startswith("#"):
-                if not line.startswith("- "):
-                    line = "- " + line
-                bullets.append(line)
+        # If summary doesn't start with a known commit type, prepend "feat: "
+        if not commit_pattern.match(summary):
+            summary = "feat: " + re.sub(r'^[\w/()]+:\s*', '', summary)
 
-        if bullets:
-            return summary + "\n" + "\n".join(bullets)
+        # Collect bullet lines that follow the summary
+        skip_prefixes = ("breaking change", "also,", "note:", "this commit", "the default",
+                         "the message", "fixes #", "closes #", "resolves #")
+        bullets = []
+        for line in all_lines[summary_idx + 1:]:
+            line = line.strip("`\"'").strip()
+            if not line or line.startswith("#"):
+                continue
+            # Normalise "- * foo", "* foo", "+ foo", "- + foo" → "foo"
+            line = re.sub(r'^[-*+\s]+', '', line).strip()
+            if not line:
+                continue
+            # If the bullet is itself a commit header (e.g. "fix(x): desc"),
+            # extract just the description after the colon
+            cm = commit_pattern.match(line)
+            if cm:
+                colon_pos = line.index(':')
+                line = line[colon_pos + 1:].strip()
+                if not line:
+                    continue
+            lower = line.lower()
+            if any(lower.startswith(kw) for kw in skip_prefixes):
+                continue
+            if len(line) > 100:  # suspiciously long = explanation
+                continue
+            if len(line) < 8:  # too short = truncated
+                continue
+            line = re.sub(r'\s*\(#\d+\)\s*$', '', line)  # strip trailing (#123)
+            bullets.append("- " + line)
+
+        # Deduplicate while preserving order
+        seen = set()
+        unique_bullets = []
+        for b in bullets:
+            if b not in seen:
+                seen.add(b)
+                unique_bullets.append(b)
+
+        if unique_bullets:
+            return summary + "\n" + "\n".join(unique_bullets)
         return summary + "\n- implementation changes"
