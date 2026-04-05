@@ -51,10 +51,10 @@ requirements = get_requirements()
 # Read README
 def get_long_description():
     try:
-        with open("README.md", "r", encoding="utf-8") as f:
+        with open("PYPI_DESCRIPTION.md", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return "FancyGit - A smart CLI tool for git"
+        return "FancyGit - An intelligent Git wrapper for beginners"
 
 long_description = get_long_description()
 

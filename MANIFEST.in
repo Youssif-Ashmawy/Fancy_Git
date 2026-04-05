@@ -1,5 +1,6 @@
 include VERSION
 include README.md
+include PYPI_DESCRIPTION.md
 include *.md
 include command-list.txt
 include game_questions.json
