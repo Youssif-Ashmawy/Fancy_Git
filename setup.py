@@ -12,7 +12,7 @@ class CustomBuildPy(_build_py):
         build_lib = os.path.join(self.build_lib, '')
         if os.path.exists(build_lib):
             shutil.copy('command-list.txt', os.path.join(build_lib, 'command-list.txt'))
-            shutil.copy('.fancygit_config', os.path.join(build_lib, '.fancygit_config'))
+            shutil.copy('game_questions.json', os.path.join(build_lib, 'game_questions.json'))
             # Copy images folder for logo files
             if os.path.exists('images'):
                 images_build_dir = os.path.join(build_lib, 'images')
@@ -68,20 +68,8 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache License 2.0",
     packages=find_packages(),
-    py_modules=["fancygit", "welcome"],
+    py_modules=["fancygit", "welcome", "quiz_server"],
     include_package_data=True,
-    package_data={
-        '': ['images/*.png', 'images/*.jpg', 'images/*.jpeg', 'images/*.gif'],
-    },
-    data_files=[
-        ('share/fancygit/images', [
-            'images/Logo.png',
-            'images/Logo_with_name.png', 
-            'images/dark_background_logo.png',
-            'images/light_background_logo.png',
-            'images/overview.png'
-        ]),
-    ],
     cmdclass={'build_py': CustomBuildPy},
     classifiers=[
         "Development Status :: 4 - Beta",

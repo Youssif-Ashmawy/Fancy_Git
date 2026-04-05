@@ -2,9 +2,10 @@ include VERSION
 include README.md
 include *.md
 include command-list.txt
-include .fancygit_config
+include game_questions.json
 include welcome.py
 include fancygit.py
+include quiz_server.py
 recursive-include src *.py
 recursive-include tests *.py
 recursive-include images *.png *.jpg *.jpeg *.gif
