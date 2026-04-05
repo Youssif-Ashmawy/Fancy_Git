@@ -157,13 +157,11 @@ class FancyGit:
         status = "enabled" if self.config_manager.config.ai_analysis_enabled else "disabled"
         print(f"AI error analysis {status}")
         
-        # Check AI provider connection when enabling
+        # Warn if provider is unreachable, but don't disable — it may come online later
         if self.config_manager.config.ai_analysis_enabled and not self.ai_engine.analysis_provider.test_connection():
-            print(color_warning("⚠️  Warning: Cannot connect to AI provider. Make sure it's running."))
-            self.config_manager.config.ai_analysis_enabled = False
-            self.config_manager.save_config()
-            return False
-        
+            print(color_warning("⚠️  Warning: Cannot connect to AI provider right now. Make sure Ollama is running."))
+            print(color_info("💡 AI analysis is still enabled and will work once Ollama is available."))
+
         return self.config_manager.config.ai_analysis_enabled
     
     def toggle_output_coloring(self, enable=None):
