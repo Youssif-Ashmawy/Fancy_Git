@@ -1407,19 +1407,17 @@ class FancyGit:
 
     def redo(self, *args):
         """Redo command that restores commits that were undone using the undo command
-        
+
         Usage: redo [--help]
-        
-        This command uses git reflog to find and restore the most recent commit
-        that was moved away from by a reset operation.
+
+        This command uses git reflog to find the commit that was moved away from
+        by the most recent reset operation, and restores HEAD to it.
         """
-        # Parse arguments
         show_help = False
-        
         for arg in args:
             if arg == '--help':
                 show_help = True
-        
+
         if show_help:
             print(color_header("Redo Command"))
             print(color_info("Usage: redo"))
@@ -1429,250 +1427,109 @@ class FancyGit:
             print("")
             print(color_info("Description:"))
             print("  Restores the most recent commit that was undone using 'undo'")
-            print("  Uses git reflog to find and re-apply the reset commit")
+            print("  Uses git reflog to find and restore HEAD to the original commit")
             print("")
             print(color_info("Examples:"))
             print("  redo           # Redo the last undo operation")
             return True
-        
+
         print(color_header("↪️  Redo Command"))
         print(Colors.divider("=", 40))
-        
+
         # Check if we're in a git repository
         returncode, stdout, stderr = self.runner.run_git_command(['rev-parse', '--git-dir'])
         if returncode != 0:
             print(color_error("❌ Not in a git repository"))
             return False
-        
+
         # Get reflog to find the most recent reset operation
-        returncode, stdout, stderr = self.runner.run_git_command(['reflog', '--oneline', '-n', '10'])
+        returncode, stdout, stderr = self.runner.run_git_command(['reflog', '--oneline', '-n', '20'])
         if returncode != 0:
             print(color_error("❌ Failed to get reflog"))
             if stderr:
                 print(stderr.strip())
             return False
-        
+
         reflog_entries = stdout.strip().split('\n')
         if not reflog_entries or not stdout.strip():
             print(color_error("❌ No reflog entries found"))
             return False
-        
-        # Find the most recent reset operation and get the commit that was moved to (the newer commit)
+
+        # Reflog is newest-first. Each entry's hash is where HEAD ended up AFTER that action.
+        # When undo runs `git reset HEAD~1`, the reflog looks like:
+        #   [i]   <old_hash>  reset: moving to HEAD~1   <- HEAD is now at old_hash
+        #   [i+1] <new_hash>  commit: ...               <- HEAD was at new_hash before the reset
+        # So the commit to restore is the hash at entry [i+1].
         target_commit = None
         for i, entry in enumerate(reflog_entries):
-            if 'reset: moving to HEAD~1' in entry:
-                # The commit that was reset FROM (the newer commit we want to redo to) 
-                # is in the reflog entry right before the reset operation
-                if i > 0:
-                    prev_entry = reflog_entries[i - 1]
-                    # Extract commit hash from the previous entry
-                    parts = prev_entry.split()
-                    if len(parts) >= 1:
+            if 'reset: moving to HEAD~' in entry:
+                if i + 1 < len(reflog_entries):
+                    next_entry = reflog_entries[i + 1]
+                    parts = next_entry.split()
+                    if parts:
                         commit_hash = parts[0]
-                        # Verify this is a valid commit hash
-                        returncode, _, _ = self.runner.run_git_command(['cat-file', '-t', commit_hash])
-                        if returncode == 0:
+                        verify_rc, _, _ = self.runner.run_git_command(['cat-file', '-t', commit_hash])
+                        if verify_rc == 0:
                             target_commit = commit_hash
                             break
+
         if not target_commit:
-            print(color_error("❌ Could not determine target commit"))
+            print(color_error("❌ No undo operation found to redo"))
             return False
-        
+
         # Get current and target commit info for display
-        returncode, current_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
-        returncode, target_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1', target_commit])
-        
-        # Extract current HEAD commit hash for comparison
-        current_commit = None
-        if current_stdout:
-            current_parts = current_stdout.strip().split()
-            if len(current_parts) >= 1:
-                current_commit = current_parts[0]
-        
+        _, current_stdout, _ = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+        _, target_stdout, _ = self.runner.run_git_command(['log', '--oneline', '-n', '1', target_commit])
+
         # Check if we're already at the target commit
-        if current_commit and current_commit.startswith(target_commit[:8]):
-            print(color_success("✅ Already at the most recent commit"))
-            print(color_info("Current state:"))
-            if current_stdout:
-                print(f"  HEAD: {color_success(current_stdout.strip())}")
-            print(color_info("No redo needed - this is already the latest commit"))
+        current_hash = current_stdout.strip().split()[0] if current_stdout.strip() else ''
+        if current_hash and target_commit.startswith(current_hash):
+            print(color_success("✅ Already at the most recent commit — no redo needed"))
+            print(f"  HEAD: {color_success(current_stdout.strip())}")
             return True
-        
+
         print(color_info("Current state:"))
         if current_stdout:
             print(f"  HEAD: {color_info(current_stdout.strip())}")
-        
         print(color_info("Will restore to:"))
         if target_stdout:
             print(f"  Commit: {color_success(target_stdout.strip())}")
-        
-        # Get repository state before redo for warning
+
+        # Warn about working directory changes that will be overwritten
         repo_state = self.get_repo_state()
-        has_staged = bool(repo_state['staged'])
-        has_modified = bool(repo_state['modified'])
-        has_untracked = bool(repo_state['untracked'])
-        
-        if has_staged or has_modified or has_untracked:
-            print(color_warning("\n⚠️  WARNING: Redo will affect current working directory:"))
-            if has_staged:
+        if repo_state['staged'] or repo_state['modified']:
+            print(color_warning("\n⚠️  WARNING: uncommitted changes will be overwritten by the redo:"))
+            if repo_state['staged']:
                 print(f"  • Staged changes: {len(repo_state['staged'])} files")
-            if has_modified:
+            if repo_state['modified']:
                 print(f"  • Modified files: {len(repo_state['modified'])} files")
-            if has_untracked:
-                print(f"  • Untracked files: {len(repo_state['untracked'])} files")
-        
+
         # Confirmation
         if self.confirmation_enabled:
-            response = input(color_info(f"\nRestore commit {target_commit[:8]}? [y/N]: ")).strip().lower()
+            response = input(color_info(f"\nRestore to commit {target_commit[:8]}? [y/N]: ")).strip().lower()
             if response not in ['y', 'yes']:
                 print(color_warning("❌ Redo operation cancelled"))
                 return False
-        
-        # Execute the redo using cherry-pick
+
+        # Restore HEAD to the original commit using reset --hard
         print(color_info(f"\n🔄 Restoring commit {target_commit[:8]}..."))
-        returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
-        
-        if returncode != 0:
-            # Check if this is a conflict due to local changes or merge conflicts
-            if ("would be overwritten by merge" in stderr or 
-                "Your local changes" in stderr or
-                "could not apply" in stderr or
-                "merge conflict" in stderr.lower() or
-                returncode == 1):  # git cherry-pick returns 1 for conflicts
-                print(color_warning("⚠️  Conflict detected during redo operation"))
-                
-                # First abort any in-progress cherry-pick to clean up
-                abort_returncode, abort_stdout, abort_stderr = self.runner.run_git_command(['cherry-pick', '--abort'])
-                
-                # Check if there are still local changes after abort
-                repo_state = self.get_repo_state()
-                has_changes = (repo_state['staged'] or repo_state['modified'] or repo_state['untracked'])
-                
-                if has_changes:
-                    print(color_info("Choose an option:"))
-                    print(color_info("  [Enter] Hard reset to match remote, then redo (default)"))
-                    print(color_info("  [s]     Stash changes, redo, then restore stash"))
-                    print(color_info("  [c]     Cancel redo operation"))
-                    
-                    choice = input(color_info("Your choice: ")).strip().lower()
-                    
-                    if choice == 'c':
-                        print(color_warning("❌ Redo operation cancelled"))
-                        return False
-                    elif choice == 's':
-                        # Stash changes
-                        print(color_info("� Stashing local changes..."))
-                        stash_returncode, stash_stdout, stash_stderr = self.runner.run_git_command(['stash', 'push', '-m', 'Redo operation backup'])
-                        if stash_returncode != 0:
-                            print(color_error("❌ Failed to stash changes"))
-                            if stash_stderr:
-                                print(stash_stderr.strip())
-                            return False
-                        print(color_success("✅ Changes stashed"))
-                        
-                        # Try redo again
-                        print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
-                        returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
-                        
-                        if returncode == 0:
-                            print(color_success("✅ Successfully restored commit"))
-                            
-                            # Try to restore stash
-                            print(color_info("🔄 Restoring stashed changes..."))
-                            pop_returncode, pop_stdout, pop_stderr = self.runner.run_git_command(['stash', 'pop'])
-                            if pop_returncode == 0:
-                                print(color_success("✅ Stashed changes restored"))
-                            else:
-                                print(color_warning("⚠️  Could not restore stashed changes"))
-                                print(color_info("Run 'git stash pop' manually to restore"))
-                                if pop_stderr:
-                                    print(pop_stderr.strip())
-                        else:
-                            print(color_error("❌ Failed to restore commit even after stashing"))
-                            if stderr:
-                                print(stderr.strip())
-                            return False
-                    else:
-                        # Default: Hard reset to match remote and pull
-                        print(color_info("🔄 Resetting to match remote branch..."))
-                        reset_returncode, reset_stdout, reset_stderr = self.runner.run_git_command(['reset', '--hard', 'origin/developer'])
-                        if reset_returncode == 0:
-                            print(color_success("✅ Reset to remote branch"))
-                            
-                            print(color_info("� Pulling latest changes..."))
-                            pull_returncode, pull_stdout, pull_stderr = self.runner.run_git_command(['pull'])
-                            if pull_returncode == 0:
-                                print(color_success("✅ Pulled latest changes"))
-                                
-                                # Check if the target commit is already in the history
-                                check_returncode, check_stdout, check_stderr = self.runner.run_git_command(['log', '--oneline', '-n', '10'])
-                                if check_returncode == 0 and target_commit[:8] in check_stdout:
-                                    print(color_success("✅ Target commit is already present in branch history"))
-                                    print(color_info("No need to restore - commit already exists"))
-                                    return True
-                                
-                                # Try redo again
-                                print(color_info(f"\n🔄 Retrying restore of commit {target_commit[:8]}..."))
-                                returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
-                                
-                                if returncode != 0:
-                                    print(color_error("❌ Failed to restore commit after sync"))
-                                    if stderr:
-                                        print(stderr.strip())
-                                    return False
-                            else:
-                                print(color_error("❌ Failed to pull changes"))
-                                if pull_stderr:
-                                    print(pull_stderr.strip())
-                                return False
-                        else:
-                            print(color_error("❌ Failed to reset to remote"))
-                            if reset_stderr:
-                                print(reset_stderr.strip())
-                            return False
-                else:
-                    # No local changes after abort, just retry directly
-                    print(color_info("🔄 Retrying restore of commit..."))
-                    returncode, stdout, stderr = self.runner.run_git_command(['cherry-pick', target_commit])
-                    
-                    if returncode != 0:
-                        print(color_error("❌ Failed to restore commit"))
-                        if stderr:
-                            print(stderr.strip())
-                        return False
-        
+        returncode, stdout, stderr = self.runner.run_git_command(['reset', '--hard', target_commit])
+
         if returncode == 0:
             print(color_success("✅ Successfully restored commit"))
-            
-            # Show new state
             print(color_info("\n📋 New repository state:"))
-            returncode, new_stdout, stderr = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
-            if returncode == 0:
+            _, new_stdout, _ = self.runner.run_git_command(['log', '--oneline', '-n', '1'])
+            if new_stdout:
                 print(f"  Current HEAD: {color_success(new_stdout.strip())}")
-            
-            # Show working directory status
             new_repo_state = self.get_repo_state()
-            if new_repo_state['staged']:
-                print(f"  Staged files: {len(new_repo_state['staged'])}")
-            if new_repo_state['modified']:
-                print(f"  Modified files: {len(new_repo_state['modified'])}")
-            if new_repo_state['untracked']:
-                print(f"  Untracked files: {len(new_repo_state['untracked'])}")
-            
             if new_repo_state['clean']:
                 print(color_success("  Working directory is clean"))
-            
             return True
         else:
             print(color_error("❌ Failed to restore commit"))
             if stderr:
                 print(stderr.strip())
-            
-            # Try to provide helpful error information
-            if "conflict" in stderr.lower():
-                print(color_info("💡 Tip: Resolve conflicts and run 'git cherry-pick --continue'"))
-            elif "empty" in stderr.lower():
-                print(color_info("💡 This commit might already be applied"))
+            return False
 
 
 def main():
