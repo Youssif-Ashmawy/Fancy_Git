@@ -139,9 +139,8 @@ class TestAIEngine:
         
         # Check prompt structure
         assert "You are a Git expert assistant" in call_args
-        assert "1. A clear summary of what went wrong" in call_args
-        assert "2. Step-by-step instructions" in call_args
-        assert "3. Any preventive measures" in call_args
+        assert "WHAT WENT WRONG:" in call_args
+        assert "HOW TO FIX IT:" in call_args
         assert "Messages to analyze:" in call_args
         assert "Analysis:" in call_args
     
