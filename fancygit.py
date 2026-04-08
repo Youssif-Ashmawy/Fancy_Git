@@ -1543,10 +1543,17 @@ class FancyGit:
             return False
 
 
+def _check_first_run():
+    marker = os.path.expanduser("~/.fancygit_initialized")
+    if not os.path.exists(marker):
+        show_welcome()
+        open(marker, "w").close()
+
 def main():
     try:
+        _check_first_run()
         fancy_git = FancyGit()
-        
+
         if len(sys.argv) < 2:
             print(color_info("Usage: fancygit <command> [args...]"))
             print(color_info("Available commands:"))
