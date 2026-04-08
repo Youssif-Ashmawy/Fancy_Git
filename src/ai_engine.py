@@ -3,6 +3,7 @@ from src.model_provider import ModelProvider
 from src.providers.ollama_model import OllamaModel
 from src.config_manager import ConfigManager
 from typing import List, Dict, Optional
+import re
 import time
 
 class AIEngine:
@@ -38,9 +39,24 @@ class AIEngine:
 
         try:
             response = self.analysis_provider._call_model(prompt)
-            return response if response else "Unable to get AI analysis."
+            return self._strip_markdown(response) if response else "Unable to get AI analysis."
         except Exception as e:
             return f"Failed to get AI analysis: {str(e)}"
+
+    def _strip_markdown(self, text: str) -> str:
+        """Remove markdown formatting so output renders cleanly in a terminal."""
+        # Remove bold/italic: **text**, *text*, __text__, _text_
+        text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
+        text = re.sub(r'_{1,3}(.*?)_{1,3}', r'\1', text)
+        # Remove ATX headings: ## Heading → Heading
+        text = re.sub(r'^\s{0,3}#{1,6}\s+', '', text, flags=re.MULTILINE)
+        # Remove inline code: `code` → code
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+        # Remove code fences
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        # Collapse 3+ blank lines down to 2
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
 
     def explain_command(self, command: str) -> Optional[str]:
         """
@@ -76,24 +92,34 @@ class AIEngine:
 
     def _build_analysis_prompt(self, messages: List[Dict]) -> str:
         """Build the analysis prompt for the AI model"""
-        prompt = """You are a Git expert assistant. Analyze the following Git error/warning messages and provide:
-        1. A clear summary of what went wrong
-        2. Step-by-step instructions on how to resolve the issue
-        3. Any preventive measures to avoid this in the future
+        prompt = """You are a Git expert assistant. Analyze the following Git error/warning messages.
 
-        Keep your response concise, practical, and focused on solutions.
+IMPORTANT FORMATTING RULES — you MUST follow these exactly:
+- Plain text only. No markdown. No asterisks, no hashes, no backticks, no bold, no headers.
+- Use this exact structure with these exact labels on their own lines:
 
-        Messages to analyze:
-        """
-        
+WHAT WENT WRONG:
+[1-2 sentences explaining the root cause]
+
+HOW TO FIX IT:
+1. [first step]
+2. [second step]
+(add more steps only if truly needed)
+
+TIP:
+[one short preventive tip, or omit this section entirely if not useful]
+
+Messages to analyze:
+"""
+
         for i, msg in enumerate(messages, 1):
             severity = msg.get('severity', 'unknown').upper()
             message_text = msg.get('message', str(msg))
             error_type = msg.get('type', 'Unknown')
             file_info = f" (file: {msg.get('file', 'N/A')})" if msg.get('file') else ""
-            
+
             prompt += f"\n{i}. [{severity}] {error_type}{file_info}\n   {message_text}\n"
-        
+
         prompt += "\n\nAnalysis:"
         return prompt
     
