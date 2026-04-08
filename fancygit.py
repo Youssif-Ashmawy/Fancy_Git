@@ -560,6 +560,19 @@ class FancyGit:
                 print(f"  Deps  : {color_file(paths['deps_mmd'])}")
                 print(f"  HTML  : {color_file(paths['html'])}")
 
+                # Add output directory to .gitignore if not already present
+                gitignore_path = os.path.join(os.getcwd(), '.gitignore')
+                output_dir_name = os.path.basename(os.path.abspath(output_dir))
+                gitignore_entry = f'{output_dir_name}/'
+                existing_lines = []
+                if os.path.exists(gitignore_path):
+                    with open(gitignore_path, 'r', encoding='utf-8') as f:
+                        existing_lines = f.read().splitlines()
+                if gitignore_entry not in existing_lines and output_dir_name not in existing_lines:
+                    with open(gitignore_path, 'a', encoding='utf-8') as f:
+                        f.write(f'\n{gitignore_entry}\n')
+                    print(color_info(f"Added {gitignore_entry} to .gitignore"))
+
                 if open_browser:
                     # Convert to absolute path for browser
                     html_path = os.path.abspath(paths['html'])

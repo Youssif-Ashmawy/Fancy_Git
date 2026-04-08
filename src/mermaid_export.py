@@ -1063,6 +1063,14 @@ class MermaidExporter:
             """
         )
 
+    def _diagram_has_content(self, mmd: str) -> bool:
+        """Return True if the diagram has actual node/edge content (not just header and styling)."""
+        for line in mmd.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith('flowchart') and not stripped.startswith('classDef'):
+                return True
+        return False
+
     def export_all(self, output_dir: str, repo_state: dict, max_commits: int = 15) -> dict:
         os.makedirs(output_dir, exist_ok=True)
 
@@ -1073,12 +1081,14 @@ class MermaidExporter:
         deps_mmd = self.python_import_dependency_flowchart(repo_root)
         tree_mmd = self.repo_file_structure_flowchart(repo_root)
 
-        diagrams = {
+        all_diagrams = {
             'Repo Status': status_mmd,
             'Commit Graph': graph_mmd,
             'Python Import Dependencies': deps_mmd,
             'Repo File Structure': tree_mmd,
         }
+
+        diagrams = {name: mmd for name, mmd in all_diagrams.items() if self._diagram_has_content(mmd)}
 
         html = self.build_html(diagrams)
 
