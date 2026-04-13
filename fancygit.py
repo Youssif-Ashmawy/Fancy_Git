@@ -613,6 +613,14 @@ class FancyGit:
             if user_input == "":
                 return True
 
+            if user_input.lower() == 'c':
+                confirm_clear = input(color_warning("Are you sure you want to clear history? This cannot be undone. (y/N)")).strip().lower()
+                if confirm_clear == 'y':
+                    self.history_manager.clear_history()
+                    print(color_success("History cleared."))
+                else:
+                    print(color_info("Clear history cancelled."))
+                return True
             if user_input[0] == 'n':
                 try: 
                     num_commands = int(user_input[1:])
