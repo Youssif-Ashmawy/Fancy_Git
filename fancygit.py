@@ -687,9 +687,11 @@ class FancyGit:
                         print(diff_text)
                         continue
                     elif choice == 'i' and 'add' in command:
-                        import subprocess
-                        subprocess.run(['git', 'add', '-p'])
-                        return True
+                        result = ui.interactive_staging(self.runner)
+                        if result:
+                            return True
+                        # If cancelled, loop back to the action menu
+                        continue
                     else:
                         print(color_warning("  Invalid choice. Try again."))
                         continue

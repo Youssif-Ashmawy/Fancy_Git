@@ -122,3 +122,95 @@ class ConfirmationUI:
         print()
         choice = input(f"  {Colors.colorize('Choice:', Colors.BRIGHT_WHITE + Colors.BOLD)} ").strip().lower()
         return choice
+
+    def interactive_staging(self, runner):
+        """Interactive file picker for staging — lets user toggle files on/off.
+        
+        Args:
+            runner: GitRunner instance to execute git add on selected files.
+            
+        Returns:
+            True if files were staged, False if cancelled.
+        """
+        # Get all unstaged/modified files from status
+        _, raw_status, _ = runner.run_git_command(['status', '--short'])
+        if not raw_status.strip():
+            print(color_warning("\n  No files to stage."))
+            return False
+
+        # Parse into (status_code, filename) pairs
+        files = []
+        for line in raw_status.strip().split("\n"):
+            line = line.strip()
+            if line:
+                status_code = line[:2].strip()
+                filename = line[2:].strip()
+                files.append((status_code, filename))
+
+        if not files:
+            print(color_warning("\n  No files to stage."))
+            return False
+
+        # Track selection state — all selected by default
+        selected = [True] * len(files)
+
+        while True:
+            # Clear and render the file picker
+            print()
+            print(Colors.colorize("─" * 12 + " Interactive Staging " + "─" * 12, Colors.WARNING, Colors.BOLD))
+            print()
+
+            for i, (status_code, filename) in enumerate(files):
+                checkbox = Colors.colorize("●", Colors.SUCCESS) if selected[i] else Colors.colorize("○", Colors.MUTED)
+                num = Colors.colorize(f"{i + 1:>2}", Colors.BRIGHT_WHITE, Colors.BOLD)
+                print(f"  {num}  {checkbox}  {Colors.git_status(status_code)} {Colors.file_path(filename)}")
+
+            count = sum(selected)
+            total = len(files)
+            print()
+            print(f"  {Colors.colorize(f'{count}/{total} selected', Colors.INFO)}")
+            print()
+            print(f"  {Colors.colorize('[1-' + str(total) + ']', Colors.BRIGHT_WHITE + Colors.BOLD)} Toggle file   "
+                  f"{Colors.colorize('[a]', Colors.WARNING + Colors.BOLD)} Toggle all   "
+                  f"{Colors.colorize('[s]', Colors.SUCCESS + Colors.BOLD)} Stage selected   "
+                  f"{Colors.colorize('[q]', Colors.ERROR + Colors.BOLD)} Cancel")
+            print()
+            action = input(f"  {Colors.colorize('Pick:', Colors.BRIGHT_WHITE + Colors.BOLD)} ").strip().lower()
+
+            if action == 'q':
+                print(color_warning("  Staging cancelled."))
+                return False
+            elif action == 'a':
+                # Toggle all: if all selected → deselect all, else select all
+                if all(selected):
+                    selected = [False] * len(files)
+                else:
+                    selected = [True] * len(files)
+            elif action == 's':
+                # Stage selected files
+                selected_files = [files[i][1] for i in range(len(files)) if selected[i]]
+                if not selected_files:
+                    print(color_warning("  No files selected. Use numbers to toggle files."))
+                    continue
+
+                print()
+                for f in selected_files:
+                    code, _, err = runner.run_git_command(['add', f])
+                    if code == 0:
+                        print(f"  {color_success('✅')} Staged: {Colors.file_path(f)}")
+                    else:
+                        print(f"  {color_error('❌')} Failed: {Colors.file_path(f)} — {err.strip()}")
+
+                print()
+                print(color_success(f"  Staged {len(selected_files)} file(s)."))
+                return True
+            else:
+                # Try to parse as a number to toggle
+                try:
+                    idx = int(action) - 1
+                    if 0 <= idx < len(files):
+                        selected[idx] = not selected[idx]
+                    else:
+                        print(color_warning(f"  Invalid number. Enter 1-{len(files)}."))
+                except ValueError:
+                    print(color_warning("  Invalid input. Try a number, 'a', 's', or 'q'."))
