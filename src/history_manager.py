@@ -10,6 +10,8 @@ class HistoryManager:
         # Ensure the directory exists
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
 
+        if not self.history_file.exists():
+            self._save_history([])
 
     def _load_history(self):
         '''Load history from the JSON file'''

@@ -21,6 +21,7 @@ try:
     from src.risk_analyzer import RiskAnalyzer
     from src.confirmation_ui import ConfirmationUI
     from src.utils import DRY_RUN_SUPPORT, get_dry_run
+    from src.history_manager import HistoryManager
     from welcome import show_welcome
 except ImportError:
     # When installed as a module, add the current directory to path
@@ -41,6 +42,7 @@ except ImportError:
     from src.risk_analyzer import RiskAnalyzer
     from src.confirmation_ui import ConfirmationUI
     from src.utils import DRY_RUN_SUPPORT, get_dry_run
+    from src.history_manager import HistoryManager
     from welcome import show_welcome
 
 #region LAUNCHER RELATED IMPORTS
@@ -63,7 +65,8 @@ class FancyGit:
         
         # initialize required components
         self.config_manager = ConfigManager()
-        self.runner = GitRunner()
+        self.history_manager = HistoryManager()
+        self.runner = GitRunner(self.history_manager)
         self.parser = GitErrorParser()
         self.mermaid = MermaidExporter(self.runner)
         self.insights = GitInsights(self.runner)
@@ -588,14 +591,65 @@ class FancyGit:
                 print(color_error(f"Failed to visualize repo: {e}"))
                 return False
         
+        # ------------------------------ NEW FEATURE: FANCYGIT HISTORY---------------------------------
+        if command == 'history':
+            print("──────── FancyGit History ────────")
+            history = self.history_manager.get_history()
+            if not history:
+                print(color_info("No history available."))
+                return True
+            
+            for idx, entry in enumerate(history[::-1], 1):  # reverse to show latest first also start from first index
+                if idx == 5:    # Show only the latest 5 commands
+                    break
+                timestamp = entry.get('timestamp')
+                cmd = entry.get('command')
+                time_str = f" (Last modified: {timestamp})" if timestamp else ""
+                print(f"{idx}. git {' '.join(cmd)}{time_str}")
+        
+            user_input = input(color_header("Select command number to repeat,\n"
+            " or type 'n' followed by a number to execute multiple history commands, \nor 'c' to clear history:")).strip()
+            
+            if user_input == "":
+                return True
+
+            if user_input[0] == 'n':
+                try: 
+                    num_commands = int(user_input[1:])
+                    for entry in history[-num_commands:]:
+                        cmd = entry.get('command')
+                        print(color_command(f"Re-running: git {' '.join(cmd)}"))
+                        code, stdout, stderr = self.runner.run_git_command(cmd)
+                        output = (stdout or "") + (stderr + "")
+                        print(output)
+                except ValueError:
+                    print(color_warning("Invalid input. Please enter a valid number after 'n'."))
+                    return False
+            else:
+                try:
+                    cmd = history[-int(user_input)].get('command')
+                    print(color_command(f"Re-running: git {' '.join(cmd)}"))
+                    code, stdout, stderr = self.runner.run_git_command(cmd)
+                    output = (stdout or "") + (stderr or "")
+                    print(output)
+                except:
+                    print(color_warning("Invalid input. Please enter a valid number"))
+                    return False
+                
+            return True
+
+        # normal commands do this
         return self._command_handler(command, *args)
     
 
+
+
     # -------------------- NEW PRIVATE FUNCTIONS ------------------- #
     def _gather_info_for_confirmation(self):
-        _, status, _ = self.runner.run_git_command(['status', '--short'])
-        _, branch, _ = self.runner.run_git_command(['branch', '--show-current'])
-        _, recent_commits, _ = self.runner.run_git_command(['log', '-5', '--oneline'])
+        # dont record these info-gathering commands in history since they are just for confirmation and not actual user-invoked commands
+        _, status, _ = self.runner.run_git_command(['status', '--short'], record_history=False)
+        _, branch, _ = self.runner.run_git_command(['branch', '--show-current'], record_history=False)
+        _, recent_commits, _ = self.runner.run_git_command(['log', '-5', '--oneline'], record_history=False)
         return status.strip(), branch.strip(), recent_commits.strip()
 
     def _dry_run_command(self, command, args):
@@ -609,8 +663,8 @@ class FancyGit:
         dry_run_parts = dry_run.split()
         if dry_run_parts and dry_run_parts[0] == "git":
             dry_run_parts = dry_run_parts[1:]
-
-        code, stdout, stderr = self.runner.run_git_command(dry_run_parts)
+        # again dont record dry-run commands in history
+        code, stdout, stderr = self.runner.run_git_command(dry_run_parts, record_history=False)
 
         output = (stdout or "") + (stderr or "")
         return output.strip(), dry_mode

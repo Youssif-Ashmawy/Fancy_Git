@@ -1,10 +1,12 @@
 import subprocess
 
 class GitRunner:
-    def __init__(self) -> None:
+    # dependency injection of history manager to record commands
+    def __init__(self, history_manager) -> None:
         self.git_cmd = "git"
-    
-    def run_git_command(self, args):
+        self.history_manager = history_manager
+
+    def run_git_command(self, args, record_history=True):
         """Run git command and capture output"""
         try:
             cmd = [self.git_cmd] + args
@@ -14,7 +16,10 @@ class GitRunner:
                 text=True, 
                 check=False
             )
+            if record_history:
+                self.history_manager.add_entry(args)
             return result.returncode, result.stdout, result.stderr
+
         except Exception as e:
             return -1, "", str(e)
     
