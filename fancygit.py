@@ -680,11 +680,23 @@ class FancyGit:
                         response = 'n'
                         break
                     elif choice == 'd':
-                        _, diff_out, diff_err = self.runner.run_git_command(['diff'])
-                        diff_text = diff_out or diff_err or "No diff available."
-                        if self.output_coloring_enabled:
-                            diff_text, _ = self.output_colorizer.colorize_output('diff', diff_out, diff_err)
-                        print(diff_text)
+                        # Use the DRY_RUN_SUPPORT map to get the right preview command
+                        preview_output, preview_mode = self._dry_run_command(command, list(args))
+
+                        if preview_output and preview_mode != "NONE":
+                            diff_text = preview_output
+                        else:
+                            # Fallback for commands not in the map
+                            _, diff_out, diff_err = self.runner.run_git_command(['diff', 'HEAD'])
+                            diff_text = diff_out or diff_err or "No changes to display."
+
+                        print()
+                        print(Colors.colorize("─" * 14 + " Preview " + "─" * 14, Colors.INFO, Colors.BOLD))
+                        print()
+                        for line in diff_text.strip().split("\n"):
+                            print(f"  {line}")
+                        print()
+                        print(Colors.colorize("─" * 38, Colors.MUTED))
                         continue
                     elif choice == 'i' and 'add' in command:
                         result = ui.interactive_staging(self.runner)

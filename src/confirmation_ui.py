@@ -35,6 +35,7 @@ class ConfirmationUI:
         self._render_command_info()
         self._render_risk()
         self._render_files()
+        self._render_dry_run()
         self._render_commits()
         self._render_ai_explanation()
 
@@ -81,6 +82,28 @@ class ConfirmationUI:
         remaining = len(self.status_lines) - 10
         if remaining > 0:
             print(f"    {Colors.colorize(f'... and {remaining} more files', Colors.MUTED)}")
+
+    def _render_dry_run(self):
+        """Render the dry-run preview output."""
+        if not self.dry_output or self.dry_mode == "NONE":
+            return
+
+        mode_labels = {
+            "REAL": "Dry Run (native)",
+            "SIMULATION": "Preview (simulated)",
+        }
+        label = mode_labels.get(self.dry_mode, f"Dry Run ({self.dry_mode})")
+
+        print()
+        print(f"  {Colors.colorize(f'{label}:', Colors.MUTED)}")
+        for line in self.dry_output.strip().split("\n")[:15]:
+            line = line.strip()
+            if line:
+                print(f"    {Colors.colorize(line, Colors.DIM)}")
+
+        remaining_lines = len(self.dry_output.strip().split("\n")) - 15
+        if remaining_lines > 0:
+            print(f"    {Colors.colorize(f'... {remaining_lines} more lines', Colors.MUTED)}")
 
     def _render_commits(self):
         """Render recent commits (max 3)."""
