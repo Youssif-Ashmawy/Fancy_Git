@@ -86,6 +86,12 @@ class AIEngine:
         """
         Confirm if a git command is safe to run based on the current repo context and command risk level.
         """
+        if isinstance(self.explanation_provider, OllamaModel):
+            ollama_provider = self.explanation_provider
+            previous_model = ollama_provider.model
+            if not ollama_provider.set_model('codellama'):
+                # We continue even if switch fails, just with less accuracy
+                pass
         prompt = self._build_confirmation_prompt(command, status, current_branch, recent_commits, command_risk_level, dry_output, dry_mode)
         
         try:
@@ -182,48 +188,25 @@ class AIEngine:
             {command}"""
     
     def _build_confirmation_prompt(self, command, status, branch, commits, risk, dry_output, dry_mode) -> str:
-         return f"""
-        You are a strict Git safety assistant.
+        return f"""You are a Git safety assistant. Given the context below, write a 1-3 sentence explanation of what this command will do and any risks.
 
-        COMMAND:
-        {command}
+Command: {command}
+Branch: {branch}
+Risk Level: {risk}
+Working tree status:
+{status}
+Recent commits:
+{commits}
+Dry-run output ({dry_mode}):
+{dry_output}
 
-        RISK:
-        {risk}
-
-        BRANCH:
-        {branch}
-
-        STATUS:
-        {status}
-
-        RECENT COMMITS:
-        {commits}
-
-        DRY RUN MODE: {dry_mode}
-
-        DRY RUN OUTPUT:
-        {dry_output}
-
-        RULES:
-        - Max 2 sentences
-        - Be specific
-        - Use dry-run output if available
-
-        STRICT:
-        - Only include [ALTERNATIVES] if RISK == DANGEROUS
-        - Always include [TIPS] (1 short tip)
-
-        FORMAT:
-
-        CONFIRMATION: <text>
-
-        [TIPS]
-        - <tip>
-
-        [ALTERNATIVES]
-        - <only if dangerous>
-        """
+Rules:
+- Max 3 sentences
+- Be specific about what files or branches are affected
+- Do NOT use markdown, headers, or bullet points
+- Do NOT include tips, alternatives, or confirmation labels
+- Just plain text explanation
+"""
 
 
     def _post_process(self, response: str, risk_level: str):

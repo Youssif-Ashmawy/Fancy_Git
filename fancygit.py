@@ -19,6 +19,7 @@ try:
     from src.output_colorizer import OutputColorizer
     from src.config_manager import ConfigManager
     from src.risk_analyzer import RiskAnalyzer
+    from src.confirmation_ui import ConfirmationUI
     from src.utils import DRY_RUN_SUPPORT, get_dry_run
     from welcome import show_welcome
 except ImportError:
@@ -38,6 +39,7 @@ except ImportError:
     from src.output_colorizer import OutputColorizer
     from src.config_manager import ConfigManager
     from src.risk_analyzer import RiskAnalyzer
+    from src.confirmation_ui import ConfirmationUI
     from src.utils import DRY_RUN_SUPPORT, get_dry_run
     from welcome import show_welcome
 
@@ -591,10 +593,10 @@ class FancyGit:
 
     # -------------------- NEW PRIVATE FUNCTIONS ------------------- #
     def _gather_info_for_confirmation(self):
-        status = self.runner.run_git_command(['status', '--short'])
-        branch = self.runner.run_git_command(['branch', '--show-current'])
-        recent_commits = self.runner.run_git_command(['log', '-5', '--oneline'])
-        return status, branch, recent_commits
+        _, status, _ = self.runner.run_git_command(['status', '--short'])
+        _, branch, _ = self.runner.run_git_command(['branch', '--show-current'])
+        _, recent_commits, _ = self.runner.run_git_command(['log', '-5', '--oneline'])
+        return status.strip(), branch.strip(), recent_commits.strip()
 
     def _dry_run_command(self, command, args):
         full_command = f"git {command} {' '.join(args)}"
@@ -603,7 +605,12 @@ class FancyGit:
         if not dry_run:
             return "Dry run not supported for this command", "NONE"
 
-        code, stdout, stderr = self.runner.run_git_command(dry_run)
+        # dry_run is a string like "git status" — split and remove "git" prefix
+        dry_run_parts = dry_run.split()
+        if dry_run_parts and dry_run_parts[0] == "git":
+            dry_run_parts = dry_run_parts[1:]
+
+        code, stdout, stderr = self.runner.run_git_command(dry_run_parts)
 
         output = (stdout or "") + (stderr or "")
         return output.strip(), dry_mode
@@ -625,16 +632,6 @@ class FancyGit:
         """A Generic git commands handler"""
         print(color_command(f"Running: git {command} {' '.join(args)}"))
 
-        # ------------ NEW FEATURE: Confirmation before executing commands ------------
-        full_command = f"git {command} {' '.join(args)}"
-        risk_level = self.risk_analyzer.analyze(command_line=full_command, ai_engine=self.ai_engine)
-        status, branch, recent_commits = self._gather_info_for_confirmation()
-        dry_output, dry_mode = self._dry_run_command(command, args)
-        confirmation_message = self.ai_engine.confirmation_command(command=full_command, status=status, current_branch=branch, recent_commits=recent_commits, command_risk_level=risk_level.value, dry_output=dry_output, dry_mode=dry_mode)
-        self._print_colored_risk_level(risk_level.value)
-        print(color_ai(f"🤖 AI Confirmation Message:\n{self.ai_engine._post_process(confirmation_message, risk_level.value)}"))
-        # ----------------------------------------------------------------------------
-
         # Show confirmation before executing the command
         if self.config_manager.config.confirmation_enabled:
             # Skip confirmation during tests to avoid stdin capture issues
@@ -643,12 +640,66 @@ class FancyGit:
                 # During tests, assume 'y' response to avoid stdin capture issues
                 response = 'y'
             else:
-                response = input(color_info(f"Execute 'git {command} {' '.join(args)}'? [y/N]: ")).strip().lower()
+                # ------------ Interactive Confirmation UI ------------
+                full_command = f"git {command} {' '.join(args)}"
+                risk_level = self.risk_analyzer.analyze(command_line=full_command, ai_engine=self.ai_engine)
+                status, branch, recent_commits = self._gather_info_for_confirmation()
+                dry_output, dry_mode = self._dry_run_command(command, args)
+
+                # Get AI explanation
+                confirmation_message = self.ai_engine.confirmation_command(
+                    command=full_command, status=status, current_branch=branch,
+                    recent_commits=recent_commits, command_risk_level=risk_level.value,
+                    dry_output=dry_output, dry_mode=dry_mode
+                )
+                ai_text = self.ai_engine._post_process(confirmation_message, risk_level.value)
+
+                # Parse status into lines
+                status_lines = [l for l in status.split("\n") if l.strip()] if status else []
+
+                # Render the confirmation UI
+                ui = ConfirmationUI(
+                    command=full_command,
+                    branch=branch,
+                    risk_level=risk_level.value,
+                    status_lines=status_lines,
+                    recent_commits=recent_commits,
+                    ai_explanation=ai_text,
+                    dry_output=dry_output,
+                    dry_mode=dry_mode,
+                )
+                ui.render()
+
+                # Interactive action loop
+                while True:
+                    choice = ui.prompt_action(command)
+                    if choice == 'y':
+                        response = 'y'
+                        break
+                    elif choice == 'n':
+                        response = 'n'
+                        break
+                    elif choice == 'd':
+                        _, diff_out, diff_err = self.runner.run_git_command(['diff'])
+                        diff_text = diff_out or diff_err or "No diff available."
+                        if self.output_coloring_enabled:
+                            diff_text, _ = self.output_colorizer.colorize_output('diff', diff_out, diff_err)
+                        print(diff_text)
+                        continue
+                    elif choice == 'i' and 'add' in command:
+                        import subprocess
+                        subprocess.run(['git', 'add', '-p'])
+                        return True
+                    else:
+                        print(color_warning("  Invalid choice. Try again."))
+                        continue
+                # -----------------------------------------------
             if response != 'y':
                 print(color_warning("Command cancelled."))
                 return False
 
         # Execute the command
+
         returncode, stdout, stderr = self.runner.run_git_command([command] + list(args))
         messages = self.parser.detect_warnings_errors(stdout, stderr)
         

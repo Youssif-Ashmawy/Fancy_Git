@@ -135,5 +135,3 @@ def get_dry_run(command_name: str, full_command: str):
         return rule["command"], "SIMULATION"
 
     return None, rule["type"]
-
-

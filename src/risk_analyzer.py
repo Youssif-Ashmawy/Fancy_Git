@@ -94,7 +94,9 @@ class RiskAnalyzer:
         # it will take the command line input and return the risk level
         
         command_parts = command_line.split()  # get the whole command line and split it into parts, then ignore the first part which is "git"
-        base_command = command_parts[0] # the base command is the first part of the command line after "git"
+        if command_parts[0] == "git":
+            command_parts = command_parts[1:]
+        base_command = command_parts[0] if command_parts else "" # the base command is the first part of the command line after "git"
 
         if not command_line:  # if there is no command after "git", return UNKNOWN
             return RiskLevel.UNKNOWN
