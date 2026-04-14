@@ -645,7 +645,7 @@ class FancyGit:
                     return False
                 
             return True
-
+            
         # normal commands do this
         return self._command_handler(command, *args)
     
@@ -704,16 +704,19 @@ class FancyGit:
             else:
                 # ------------ Interactive Confirmation UI ------------
                 full_command = f"git {command} {' '.join(args)}"
-                risk_level = self.risk_analyzer.analyze(command_line=full_command, ai_engine=self.ai_engine)
-                status, branch, recent_commits = self._gather_info_for_confirmation()
-                dry_output, dry_mode = self._dry_run_command(command, args)
 
-                # Get AI explanation
-                confirmation_message = self.ai_engine.confirmation_command(
-                    command=full_command, status=status, current_branch=branch,
-                    recent_commits=recent_commits, command_risk_level=risk_level.value,
-                    dry_output=dry_output, dry_mode=dry_mode
-                )
+                with LoadingContext(animation_type=self.config_manager.config.loading_animation):
+                    risk_level = self.risk_analyzer.analyze(command_line=full_command, ai_engine=self.ai_engine)
+                    status, branch, recent_commits = self._gather_info_for_confirmation()
+                    dry_output, dry_mode = self._dry_run_command(command, args)
+
+                    # Get AI explanation
+                    confirmation_message = self.ai_engine.confirmation_command(
+                        command=full_command, status=status, current_branch=branch,
+                        recent_commits=recent_commits, command_risk_level=risk_level.value,
+                        dry_output=dry_output, dry_mode=dry_mode
+                    )
+                
                 ai_text = self.ai_engine._post_process(confirmation_message, risk_level.value)
 
                 # Parse status into lines

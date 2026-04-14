@@ -4,7 +4,7 @@ class GitRunner:
     # dependency injection of history manager to record commands
     def __init__(self, history_manager) -> None:
         self.git_cmd = "git"
-        self.history_manager = history_manager
+        self.history_manager = history_manager  # Store the history manager instance for later use
 
     def run_git_command(self, args, record_history=True):
         """Run git command and capture output"""
