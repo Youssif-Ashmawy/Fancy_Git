@@ -99,6 +99,18 @@ class AIEngine:
             return response if response else "Unable to get confirmation."
         except Exception as e:
             return f"Failed to get confirmation: {str(e)}"
+        
+    def summarize_incoming_outgoing(self, current_branch, upstream_branch, behind_count, ahead_count, incoming_commits, outgoing_commits) -> str:
+        """
+        Summarize incoming and outgoing commits before a sync operation.
+        """
+        prompt = self._build_incoming_summary_prompt(current_branch, upstream_branch, behind_count, ahead_count, incoming_commits, outgoing_commits)
+        
+        try:
+            response = self.analysis_provider._call_model(prompt)
+            return response if response else "Unable to summarize changes."
+        except Exception as e:
+            return f"Failed to summarize changes: {str(e)}"
 
     def _build_analysis_prompt(self, messages: List[Dict]) -> str:
         """Build the analysis prompt for the AI model"""
@@ -186,7 +198,56 @@ class AIEngine:
             Now classify this command:
 
             {command}"""
-    
+
+    def _build_incoming_summary_prompt(self, current_branch, upstream_branch, behind_count, ahead_count, incoming_commits, outgoing_commits) -> str:
+        return f"""You are an expert software engineer and Git assistant.
+
+        You are helping a developer understand the state of their Git branch before syncing.
+
+        Context:
+        - Current branch: {current_branch}
+        - Upstream branch: {upstream_branch}
+        - Commits behind: {behind_count}
+        - Commits ahead: {ahead_count}
+
+        Tasks:
+        1. Summarize incoming changes (what will be pulled)
+        2. Summarize outgoing changes (what will be pushed), if any
+        3. Group related changes into meaningful features/fixes
+        4. Ignore trivial commits (formatting, typos, minor logs)
+        5. Highlight any potential risks:
+        - breaking changes
+        - large refactors
+        - dependency updates
+        - core system changes (auth, database, CLI, config)
+
+        Output format MUST be:
+
+        🧠 Sync Summary:
+
+        📥 Incoming Changes:
+        • <grouped changes>
+
+        📤 Outgoing Changes:
+        • <grouped changes or "None">
+
+        ⚠ Risk Assessment:
+        • <short insight (Low / Medium / High) + reason>
+
+        Keep it concise, structured, and developer-friendly.
+        Do NOT repeat commit messages verbatim.
+        Do NOT include commit hashes.
+
+        ---
+
+        Incoming commits:
+        {incoming_commits}
+
+        ---
+
+        Outgoing commits:
+        {outgoing_commits}"""
+
     def _build_confirmation_prompt(self, command, status, branch, commits, risk, dry_output, dry_mode) -> str:
         return f"""You are a Git safety assistant. Given the context below, write a 1-3 sentence explanation of what this command will do and any risks.
 

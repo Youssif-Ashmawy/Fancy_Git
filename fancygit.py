@@ -274,6 +274,93 @@ class FancyGit:
 
         return [new_branch for new_branch in remote_branches if new_branch not in local_branches]
 
+
+    def _analyze_branch_status(self):
+        code, stdout, stderr = self.runner.run_git_command(['branch', '-vv'])
+
+        if code != 0:
+            print(color_error("Failed to analyze branch status."))
+            print(stderr)
+            return []
+
+        branches_info = []
+
+        for line in stdout.splitlines():
+            line = line.strip()
+
+            # remove leading "*"
+            if line.startswith("*"):
+                line = line[1:].strip()
+
+            parts = line.split()
+
+            if not parts:
+                continue
+
+            branch_name = parts[0]
+
+            # extract tracking info inside [...]
+            tracking_info = None
+            if '[' in line and ']' in line:
+                tracking_info = line.split('[')[1].split(']')[0]
+
+            branches_info.append({
+                "branch": branch_name,
+                "tracking": tracking_info
+            })
+
+        return branches_info
+
+    def _summarize_branch_status(self, branches_info):
+        print("\n📊 Sync Summary:")
+
+        for info in branches_info:
+            branch = info["branch"]
+            tracking = info["tracking"]
+
+            if not tracking:
+                continue
+
+            if "gone" in tracking:
+                print(color_error(f"• {branch} → remote branch deleted"))
+
+            elif "ahead" in tracking and "behind" in tracking:
+                print(color_info(f"• {branch} → 🔀 diverged ({tracking})"))
+
+            
+            elif "behind" in tracking:
+                behind = tracking.split("behind")[1].strip()
+                print(color_info(f"• {branch} → ⬇ behind {behind} commits"))
+            elif "ahead" in tracking:
+                ahead = tracking.split("ahead")[1].strip()
+                print(color_info(f"• {branch} → ⬆ ahead {ahead} commits"))
+
+
+    def _get_upstream_branch(self):
+        code, stdout, stderr = self.runner.run_git_command(
+            ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']
+        )
+        return stdout.strip() if code == 0 else None
+    
+    def _get_incoming_commits(self, upstream):
+        code, stdout, stderr = self.runner.run_git_command(
+            ['log', f'HEAD..{upstream}', '--oneline']
+        )
+        return stdout.splitlines() if code == 0 else []
+    
+    def _get_outgoing_commits(self, upstream):
+        code, stdout, stderr = self.runner.run_git_command(
+            ['log', f'{upstream}..HEAD', '--oneline']
+        )
+        return stdout.splitlines() if code == 0 else []
+    
+    def _get_current_branch(self):
+        code, stdout, stderr = self.runner.run_git_command(
+            ['branch', '--show-current']
+        )
+
+        return stdout.strip() if code == 0 else None
+
     def execute_command(self, command, *args):
         """Unified dynamic command executor"""
         if command not in self.available_commands:
@@ -320,9 +407,13 @@ class FancyGit:
             if code == 0:
                 if stdout.strip() or stderr.strip():
                     print(stdout.strip() if stdout.strip() else stderr.strip())
-                print("✅ Fetch completed successfully!")
+                print(color_success("Fetch completed successfully!"))
+
+                branches_info = self._analyze_branch_status()
+                if branches_info:
+                    self._summarize_branch_status(branches_info)
             else:
-                print("❌ Failed to fetch branches.")
+                print(color_error("Failed to fetch branches."))
                 print(stderr)
 
             if '--all-branches' in args:
@@ -330,18 +421,26 @@ class FancyGit:
                 
                 if new_branches:
                     print("\nNew remote branches detected:")
-                    
                     for branch in new_branches:
-                        print("  origin/", branch)
+                        print(color_info(f"  origin/{branch}"))
+                    user_input = input("Create local branches to track these branches? (Y/n)").strip().lower()
 
-                    user_input = input("Create local branches to track these branches? (Y/n)").lower()
-
-                    if user_input == 'y':
+                    if user_input in ['y', 'yes', '']:
                         print("Creating local branches....")
+
                         for branch in new_branches:
-                            self.runner.run_git_command(['checkout', '-b', branch, f"origin/{branch}"])     # ignore output for now cause well i cant find a use for it
-                        
-                        print("Done Creating local branches!!")
+                            code, stdout, stderr = self.runner.run_git_command([
+                                'switch', '-c', branch, '--track', f'origin/{branch}'
+                            ])
+
+                            if code == 0:
+                                print(color_success(f"Created local branch for {branch}"))
+                            else:
+                                if "already exists" in stderr.lower():
+                                    print(color_info(f"Branch already exists: {branch} (skipping)"))
+                                else:
+                                    print(color_error(f"Failed to create branch {branch}: {stderr.strip()}"))
+
                         return
             elif '--ai-summary' in args:    # will implement a feature later that will changes smth like this
                 # Warning: Your local branch is 12 commits behind origin/main.
@@ -351,9 +450,18 @@ class FancyGit:
                 # • New authentication middleware
                 # • Refactor of merge parser
                 # • Bug fix in CLI command loader
+                upstream_branch = self._get_upstream_branch()
+                incoming_commits = self._get_incoming_commits(upstream_branch)
+                outgoing_commits = self._get_outgoing_commits(upstream_branch)
+                ahead_count = len(outgoing_commits)
+                behind_count = len(incoming_commits)
+                current_branch = self._get_current_branch()
 
+                incoming = "\n".join(incoming_commits[:20])
+                outgoing = "\n".join(outgoing_commits[:20])
 
-                pass
+                output = self.ai_engine.summarize_incoming_outgoing(current_branch, upstream_branch, behind_count, ahead_count, incoming, outgoing)
+                print(color_info(output))
             return
         
         # Handle confirmation command specially
